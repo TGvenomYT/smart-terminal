@@ -151,6 +151,7 @@ _st_detect_project() {
 
 # Smart entry point finder for Python projects
 _st_find_python_entry() {
+    setopt local_options null_glob
     # 1. Check pyproject.toml for scripts
     if [[ -f "pyproject.toml" ]]; then
         local script=$(grep -A5 '\[project.scripts\]' pyproject.toml 2>/dev/null | grep '=' | head -1 | cut -d'=' -f1 | tr -d ' ')
