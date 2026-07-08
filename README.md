@@ -106,10 +106,11 @@ Smart Terminal detects your project type and runs the right command:
 
 ```bash
 ? run       # Python: creates venv if needed, installs deps if found, runs entry point
-            # Node: npm run dev  |  Docker: docker compose up -d  |  Rust: cargo run
-? test      # Python: pytest  |  Node: npm test  |  Rust: cargo test
-? build     # Python: python3 -m build  |  Node: npm run build  |  Rust: cargo build
-? setup     # Creates venv + installs deps (or npm install, cargo fetch, etc.)
+            # Node: npm run dev  |  Rust: cargo run  |  C/C++: gcc/g++/cmake → run
+            # Docker: docker compose up -d  |  Go: go run .
+? test      # Python: pytest  |  Node: npm test  |  Rust: cargo test  |  C++: ctest
+? build     # Python: python3 -m build  |  Node: npm run build  |  C: gcc  |  C++: cmake/g++
+? setup     # Creates venv + installs deps (or npm install, cmake -B build, cargo fetch, etc.)
 ? lint      # Python: ruff check  |  Node: npm run lint  |  Rust: cargo clippy
 ? format    # Python: ruff format  |  Node: prettier  |  Rust: cargo fmt
 ? clean     # Removes build artifacts per project type
@@ -269,7 +270,7 @@ Then assign a hotkey in System Settings → Keyboard → Keyboard Shortcuts → 
 The dictionary handles ~250+ patterns across:
 
 - **Navigation** — dynamic path resolution, finds folders anywhere in ~/
-- **Context-aware** — run, test, build, setup, lint, format, clean (adapts to project type)
+- **Context-aware** — run, test, build, setup, lint, format, clean (adapts to Python, Node, Rust, Go, C, C++, Java, Ruby, Docker)
 - **Docker** — status, start/stop/restart Desktop app, containers, compose, images, logs, prune, exec, stats
 - **Ports & Networking** — lsof, kill port, IP, public IP, WiFi, DNS, ping, speed test
 - **System** — CPU, RAM, battery, disk, uptime, processes, serial number
