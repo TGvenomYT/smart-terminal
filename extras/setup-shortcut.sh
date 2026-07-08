@@ -1,11 +1,7 @@
 #!/bin/bash
-# setup-shortcut.sh — Creates a macOS Service/Quick Action for OCR Explain
-# This allows you to bind it to a global keyboard shortcut.
+# setup-shortcut.sh — Installs OCR Explain app and helps set up a global hotkey
 #
-# After running this script:
-# 1. Go to System Settings → Keyboard → Keyboard Shortcuts → Services
-# 2. Find "OCR Explain" under General
-# 3. Assign your preferred shortcut (e.g., Ctrl+Shift+E)
+# Usage: ./extras/setup-shortcut.sh
 
 set -euo pipefail
 
@@ -13,167 +9,98 @@ CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 DIM='\033[2m'
 RED='\033[0;31m'
+BOLD='\033[1m'
 RESET='\033[0m'
 
-SERVICE_NAME="OCR Explain"
-SERVICE_DIR="$HOME/Library/Services/${SERVICE_NAME}.workflow"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_NAME="OCR Explain"
+APP_SOURCE="${SCRIPT_DIR}/${APP_NAME}.app"
+APP_DEST="/Applications/${APP_NAME}.app"
 SCRIPT_PATH="$HOME/.smart-terminal/bin/ocr-explain"
 
 echo ""
-echo -e "${CYAN}Setting up OCR Explain keyboard shortcut...${RESET}"
+echo -e "${BOLD}OCR Explain — Global Hotkey Setup${RESET}"
 echo ""
 
 # Check if ocr-explain is installed
 if [[ ! -f "$SCRIPT_PATH" ]]; then
-    echo -e "${RED}✗ ocr-explain not found at $SCRIPT_PATH${RESET}"
-    echo -e "${DIM}Run install.sh first.${RESET}"
+    echo -e "${RED}✗ ocr-explain not found. Run install.sh first.${RESET}"
     exit 1
 fi
 
-# Create the Automator workflow directory structure
-mkdir -p "${SERVICE_DIR}/Contents"
+# Build the .app if it doesn't exist in extras
+if [[ ! -d "$APP_SOURCE" ]]; then
+    echo -e "  ${DIM}Building OCR Explain.app...${RESET}"
+    mkdir -p "${APP_SOURCE}/Contents/MacOS"
+    mkdir -p "${APP_SOURCE}/Contents/Resources"
 
-# Write the Info.plist
-cat > "${SERVICE_DIR}/Contents/Info.plist" << 'PLIST'
+    cat > "${APP_SOURCE}/Contents/Info.plist" << 'INFOPLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSServices</key>
-	<array>
-		<dict>
-			<key>NSMenuItem</key>
-			<dict>
-				<key>default</key>
-				<string>OCR Explain</string>
-			</dict>
-			<key>NSMessage</key>
-			<string>runWorkflowAsService</string>
-		</dict>
-	</array>
+	<key>CFBundleExecutable</key>
+	<string>OCR Explain</string>
+	<key>CFBundleIconFile</key>
+	<string>applet</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.niranjan.ocr-explain</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>OCR Explain</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	<key>LSUIElement</key>
+	<true/>
 </dict>
 </plist>
-PLIST
+INFOPLIST
 
-# Write the workflow document
-cat > "${SERVICE_DIR}/Contents/document.wflow" << WFLOW
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>AMApplicationBuild</key>
-	<string>523</string>
-	<key>AMApplicationVersion</key>
-	<string>2.10</string>
-	<key>AMDocumentVersion</key>
-	<string>2</string>
-	<key>actions</key>
-	<array>
-		<dict>
-			<key>action</key>
-			<dict>
-				<key>AMAccepts</key>
-				<dict>
-					<key>Container</key>
-					<string>List</string>
-					<key>Optional</key>
-					<true/>
-					<key>Types</key>
-					<array>
-						<string>com.apple.cocoa.string</string>
-					</array>
-				</dict>
-				<key>AMActionVersion</key>
-				<string>2.0.3</string>
-				<key>AMApplication</key>
-				<array>
-					<string>Automator</string>
-				</array>
-				<key>AMBundleIdentifier</key>
-				<string>com.apple.RunShellScript</string>
-				<key>AMCategory</key>
-				<array>
-					<string>AMCategoryUtilities</string>
-				</array>
-				<key>AMIconName</key>
-				<string>Automator</string>
-				<key>AMKeywords</key>
-				<array>
-					<string>Shell</string>
-					<string>Script</string>
-				</array>
-				<key>AMName</key>
-				<string>Run Shell Script</string>
-				<key>AMRequiredResources</key>
-				<array/>
-				<key>AMTag</key>
-				<string>AMTagUtilities</string>
-				<key>ActionBundlePath</key>
-				<string>/System/Library/Automator/Run Shell Script.action</string>
-				<key>ActionName</key>
-				<string>Run Shell Script</string>
-				<key>ActionParameters</key>
-				<dict>
-					<key>COMMAND_STRING</key>
-					<string>\$HOME/.smart-terminal/bin/ocr-explain 2>/dev/null &amp;</string>
-					<key>CheckedForUserDefaultShell</key>
-					<true/>
-					<key>inputMethod</key>
-					<integer>1</integer>
-					<key>shell</key>
-					<string>/bin/bash</string>
-					<key>source</key>
-					<string></string>
-				</dict>
-				<key>BundleIdentifier</key>
-				<string>com.apple.RunShellScript</string>
-				<key>CFBundleVersion</key>
-				<string>2.0.3</string>
-				<key>CanShowSelectedItemsWhenRun</key>
-				<false/>
-				<key>CanShowWhenRun</key>
-				<true/>
-				<key>Category</key>
-				<array>
-					<string>AMCategoryUtilities</string>
-				</array>
-				<key>Class Name</key>
-				<string>RunShellScriptAction</string>
-				<key>InputUUID</key>
-				<string>E1A2B3C4-D5E6-F7A8-B9C0-D1E2F3A4B5C6</string>
-				<key>Keywords</key>
-				<array>
-					<string>Shell</string>
-					<string>Script</string>
-				</array>
-				<key>OutputUUID</key>
-				<string>A1B2C3D4-E5F6-A7B8-C9D0-E1F2A3B4C5D6</string>
-				<key>UUID</key>
-				<string>F1E2D3C4-B5A6-9870-1234-567890ABCDEF</string>
-				<key>UnlocalizedApplications</key>
-				<array>
-					<string>Automator</string>
-				</array>
-			</dict>
-		</dict>
-	</array>
-	<key>connectors</key>
-	<dict/>
-	<key>workflowMetaData</key>
-	<dict>
-		<key>workflowTypeIdentifier</key>
-		<string>com.apple.Automator.servicesMenu</string>
-	</dict>
-</dict>
-</plist>
-WFLOW
+    cat > "${APP_SOURCE}/Contents/MacOS/${APP_NAME}" << 'LAUNCHER'
+#!/bin/bash
+# OCR Explain launcher — opens Terminal and runs ocr-explain
+osascript -e 'tell application "Terminal"' -e 'activate' -e 'do script "$HOME/.smart-terminal/bin/ocr-explain"' -e 'end tell'
+LAUNCHER
+    chmod +x "${APP_SOURCE}/Contents/MacOS/${APP_NAME}"
+fi
 
-echo -e "  ${GREEN}✓${RESET} Created Quick Action: ${SERVICE_NAME}"
+# Copy to /Applications
+if [[ -d "$APP_DEST" ]]; then
+    rm -rf "$APP_DEST"
+fi
+cp -r "$APP_SOURCE" "$APP_DEST"
+echo -e "  ${GREEN}✓${RESET} Installed to /Applications/OCR Explain.app"
+
+# Remove old Quick Action if it exists
+if [[ -d "$HOME/Library/Services/OCR Explain.workflow" ]]; then
+    rm -rf "$HOME/Library/Services/OCR Explain.workflow"
+    echo -e "  ${DIM}Removed old Quick Action workflow${RESET}"
+fi
+
 echo ""
-echo -e "${CYAN}Next steps:${RESET}"
-echo -e "  1. Open ${CYAN}System Settings → Keyboard → Keyboard Shortcuts → Services${RESET}"
-echo -e "  2. Find ${GREEN}\"OCR Explain\"${RESET} under ${DIM}General${RESET}"
-echo -e "  3. Click it and assign a shortcut (e.g., ${GREEN}⌃⇧E${RESET})"
+echo -e "${CYAN}To assign a global keyboard shortcut:${RESET}"
 echo ""
-echo -e "${DIM}After that, press your shortcut from anywhere to screenshot + OCR + explain.${RESET}"
+echo -e "  ${BOLD}Option A — Spotlight (quick):${RESET}"
+echo -e "    Press ⌘Space, type \"OCR Explain\", hit Enter"
+echo ""
+echo -e "  ${BOLD}Option B — Global hotkey (recommended):${RESET}"
+echo -e "    1. Open ${CYAN}System Settings → Keyboard → Keyboard Shortcuts${RESET}"
+echo -e "    2. Click ${CYAN}App Shortcuts${RESET} → click ${GREEN}+${RESET}"
+echo -e "    3. Application: ${GREEN}All Applications${RESET}"
+echo -e "       Menu title: ${GREEN}OCR Explain${RESET}"
+echo -e "       Shortcut: ${GREEN}⌃⇧E${RESET} (or your preference)"
+echo ""
+echo -e "  ${BOLD}Option C — Automator:${RESET}"
+echo -e "    1. Open Automator → New → Quick Action"
+echo -e "    2. Add \"Launch Application\" action → select \"OCR Explain\""
+echo -e "    3. Save, then assign shortcut in System Settings → Services"
+echo ""
+echo -e "${DIM}The app opens Terminal, captures your screen selection, OCRs it, and explains.${RESET}"
 echo ""
