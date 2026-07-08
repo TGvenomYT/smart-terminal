@@ -32,34 +32,30 @@ _st_find_folder() {
         echo "$found"; return 0
     fi
 
-    # 2. Check subdirectories of common parent folders
-    local search_dirs=("$HOME" "$HOME/Projects" "$HOME/Developer" "$HOME/Documents" "$HOME/Desktop" "$HOME/Documents/Projects" "$HOME/Documents/projects")
-    for dir in "${search_dirs[@]}"; do
-        if [[ -d "$dir" ]]; then
-            # Exact match (case-insensitive)
-            local match=$(find "$dir" -maxdepth 1 -type d -iname "$target" 2>/dev/null | head -1)
-            if [[ -n "$match" ]]; then
-                echo "$match"; return 0
-            fi
-        fi
-    done
-
-    # 3. Fuzzy: prefix match in common dirs
-    for dir in "${search_dirs[@]}"; do
-        if [[ -d "$dir" ]]; then
-            local match=$(find "$dir" -maxdepth 1 -type d -iname "${target}*" 2>/dev/null | head -1)
-            if [[ -n "$match" ]]; then
-                echo "$match"; return 0
-            fi
-        fi
-    done
-
-    # 4. Current directory children
+    # 2. Current directory children (immediate)
     local match=$(find . -maxdepth 1 -type d -iname "$target" 2>/dev/null | head -1)
     if [[ -n "$match" ]]; then
         echo "$match"; return 0
     fi
-    match=$(find . -maxdepth 1 -type d -iname "${target}*" 2>/dev/null | head -1)
+
+    # 3. Search the entire home directory (up to depth 4, fast timeout)
+    match=$(find "$HOME" -maxdepth 4 -type d -iname "$target" \
+        -not -path "*/.*" \
+        -not -path "*/node_modules/*" \
+        -not -path "*/Library/*" \
+        -not -path "*/.Trash/*" \
+        2>/dev/null | head -1)
+    if [[ -n "$match" ]]; then
+        echo "$match"; return 0
+    fi
+
+    # 4. Fuzzy: prefix match across home
+    match=$(find "$HOME" -maxdepth 3 -type d -iname "${target}*" \
+        -not -path "*/.*" \
+        -not -path "*/node_modules/*" \
+        -not -path "*/Library/*" \
+        -not -path "*/.Trash/*" \
+        2>/dev/null | head -1)
     if [[ -n "$match" ]]; then
         echo "$match"; return 0
     fi
@@ -201,9 +197,8 @@ _st_lookup_command() {
         if [[ -n "$resolved" ]]; then
             echo "cd $resolved"; return 0
         fi
-        # Single word that looks like a folder name but not found — don't fall through
-        # to avoid false matches like "smart-terminal" hitting "rm" pattern
-        echo "cd ~/$q"; return 0
+        # Folder not found anywhere — don't fall through to unrelated patterns
+        return 1
     fi
 
     # "open here" / "open ." / "open current"
