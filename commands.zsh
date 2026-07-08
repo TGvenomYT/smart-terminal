@@ -174,12 +174,57 @@ _st_find_python_entry() {
         fi
     fi
 
-    # 4. Scan for files with if __name__ == "__main__"
+    # 4. Check ecosystem.config.js (PM2)
+    if [[ -f "ecosystem.config.js" ]]; then
+        local pm2_script=$(grep -o "script:.*" ecosystem.config.js 2>/dev/null | head -1 | grep -oE "['\"].*\.py['\"]" | tr -d "'\"")
+        if [[ -n "$pm2_script" ]] && [[ -f "$pm2_script" ]]; then
+            echo "python3 $pm2_script"; return 0
+        fi
+    fi
+
+    # 5. Check script.sh for python run command
+    if [[ -f "script.sh" ]]; then
+        local sh_cmd=$(grep -E 'python3?|uvicorn|gunicorn|flask' script.sh 2>/dev/null | grep -v '^#' | head -1 | sed 's/^[[:space:]]*//')
+        if [[ -n "$sh_cmd" ]]; then
+            echo "$sh_cmd"; return 0
+        fi
+    fi
+
+    # 6. Check README.md for run instructions
+    if [[ -f "README.md" ]]; then
+        # Look for python/uvicorn/gunicorn commands in code blocks or after "run" context
+        local readme_cmd=$(grep -E '^\s*(python3?|uvicorn|gunicorn|flask run|fastapi run)' README.md 2>/dev/null | grep -v 'install\|pip\|test\|pytest' | head -1 | sed 's/^[[:space:]]*//' | sed 's/^`//' | sed 's/`$//')
+        if [[ -n "$readme_cmd" ]]; then
+            echo "$readme_cmd"; return 0
+        fi
+        # Also check for inline code like `python3 main_api.py`
+        readme_cmd=$(grep -oE '`(python3?|uvicorn|gunicorn) [^`]+`' README.md 2>/dev/null | head -1 | tr -d '`')
+        if [[ -n "$readme_cmd" ]]; then
+            echo "$readme_cmd"; return 0
+        fi
+    fi
+
+    # 7. Check docker-compose.yml for the command
+    if [[ -f "docker-compose.yml" ]]; then
+        local dc_cmd=$(grep -A2 'command:' docker-compose.yml 2>/dev/null | grep -E 'python3?|uvicorn|gunicorn' | head -1 | sed 's/^[[:space:]]*//' | sed 's/^- //')
+        if [[ -n "$dc_cmd" ]]; then
+            echo "$dc_cmd"; return 0
+        fi
+    fi
+
+    # 8. Scan for files with if __name__ == "__main__"
     local main_files=()
-    for f in *.py **/*.py; do
+    for f in *.py; do
         [[ -f "$f" ]] || continue
-        # Skip test files, setup files, __init__
-        [[ "$f" == test_* ]] || [[ "$f" == *test*.py ]] || [[ "$f" == setup.py ]] || [[ "$f" == conftest.py ]] || [[ "$f" == __* ]] && continue
+        [[ "$f" == test_* ]] || [[ "$f" == *_test.py ]] || [[ "$f" == setup.py ]] || [[ "$f" == conftest.py ]] || [[ "$f" == __* ]] && continue
+        if grep -q '__name__.*__main__\|if __name__' "$f" 2>/dev/null; then
+            main_files+=("$f")
+        fi
+    done
+    # Also check one level deep
+    for f in */*.py; do
+        [[ -f "$f" ]] || continue
+        [[ "$f" == */test_* ]] || [[ "$f" == *_test.py ]] || [[ "$f" == */setup.py ]] || [[ "$f" == */conftest.py ]] || [[ "$f" == */__* ]] && continue
         if grep -q '__name__.*__main__\|if __name__' "$f" 2>/dev/null; then
             main_files+=("$f")
         fi
@@ -191,7 +236,7 @@ _st_find_python_entry() {
     fi
 
     # If multiple, prefer common names
-    for name in main.py app.py server.py run.py cli.py; do
+    for name in main.py app.py main_api.py server.py run.py api.py cli.py; do
         for f in "${main_files[@]}"; do
             if [[ "$(basename $f)" == "$name" ]]; then
                 echo "python3 $f"; return 0
@@ -199,20 +244,20 @@ _st_find_python_entry() {
         done
     done
 
-    # If still multiple, use the first one (usually top-level)
+    # If still multiple, pick the first top-level one
     if [[ ${#main_files[@]} -gt 0 ]]; then
         echo "python3 ${main_files[1]}"; return 0
     fi
 
-    # 5. Fallback: check for common entry point names
-    for f in main.py app.py server.py run.py manage.py cli.py; do
+    # 9. Fallback: check for common entry point names
+    for f in main.py app.py main_api.py api.py server.py run.py manage.py cli.py; do
         if [[ -f "$f" ]]; then
             echo "python3 $f"; return 0
         fi
     done
 
-    # 6. Check subdirectories one level deep
-    for f in */main.py */app.py */cli.py; do
+    # 10. Check subdirectories
+    for f in */main.py */app.py */api.py */cli.py; do
         if [[ -f "$f" ]]; then
             echo "python3 $f"; return 0
         fi
