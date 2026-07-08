@@ -105,24 +105,96 @@ fi
 
 echo ""
 
-# Abort if critical deps missing
+# ─── Offer to install missing deps ───
+
+# Check if brew is available (needed to install things)
+HAS_BREW=false
+if command -v brew &>/dev/null; then
+    HAS_BREW=true
+fi
+
+# Install missing required deps
 if [[ ${#MISSING[@]} -gt 0 ]]; then
     echo -e "${RED}Missing required dependencies:${RESET}"
     for dep in "${MISSING[@]}"; do
         echo -e "  • $dep"
     done
     echo ""
-    echo -e "Install them and run this script again."
-    exit 1
+
+    if [[ "$HAS_BREW" == "true" ]]; then
+        echo -n -e "Install them with Homebrew? [Y/n]: "
+        read -r install_deps
+        if [[ ! "$install_deps" =~ ^[Nn]$ ]]; then
+            for dep in "${MISSING[@]}"; do
+                case "$dep" in
+                    apfel)
+                        echo -e "  ${DIM}Installing apfel...${RESET}"
+                        brew install apfel 2>/dev/null || {
+                            # If not in homebrew core, try tap or direct install
+                            echo -e "  ${YELLOW}△${RESET} apfel not in Homebrew. Trying direct install..."
+                            curl -fsSL https://raw.githubusercontent.com/Arthur-Ficial/apfel/main/install.sh | bash 2>/dev/null || {
+                                echo -e "  ${RED}✗${RESET} Could not auto-install apfel."
+                                echo -e "    ${DIM}Install manually: https://github.com/Arthur-Ficial/apfel${RESET}"
+                            }
+                        }
+                        ;;
+                    perl)
+                        echo -e "  ${DIM}Installing perl...${RESET}"
+                        brew install perl
+                        ;;
+                    *)
+                        echo -e "  ${DIM}Installing $dep...${RESET}"
+                        brew install "$dep" 2>/dev/null || echo -e "  ${RED}✗${RESET} Could not install $dep"
+                        ;;
+                esac
+            done
+            echo ""
+        else
+            echo -e "Install them manually and run this script again."
+            exit 1
+        fi
+    else
+        echo -e "${YELLOW}Homebrew not found.${RESET} Install dependencies manually:"
+        echo ""
+        echo -e "  1. Install Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+        echo -e "  2. Install apfel:    https://github.com/Arthur-Ficial/apfel"
+        echo ""
+        echo -e "Then run this script again."
+        exit 1
+    fi
 fi
 
-# Show warnings
+# Install optional deps
 if [[ ${#WARNINGS[@]} -gt 0 ]]; then
     echo -e "${YELLOW}Optional dependencies (some features won't work without them):${RESET}"
     for warn in "${WARNINGS[@]}"; do
         echo -e "  • $warn"
     done
     echo ""
+
+    if [[ "$HAS_BREW" == "true" ]]; then
+        echo -n -e "Install optional dependencies? [Y/n]: "
+        read -r install_optional
+        if [[ ! "$install_optional" =~ ^[Nn]$ ]]; then
+            for warn in "${WARNINGS[@]}"; do
+                case "$warn" in
+                    *glow*)
+                        echo -e "  ${DIM}Installing glow...${RESET}"
+                        brew install glow 2>/dev/null && echo -e "  ${GREEN}✓${RESET} glow installed" || echo -e "  ${YELLOW}△${RESET} Could not install glow"
+                        ;;
+                    *python*)
+                        echo -e "  ${DIM}Installing python3...${RESET}"
+                        brew install python3 2>/dev/null && echo -e "  ${GREEN}✓${RESET} python3 installed" || echo -e "  ${YELLOW}△${RESET} Could not install python3"
+                        ;;
+                    *git*)
+                        echo -e "  ${DIM}Installing git...${RESET}"
+                        brew install git 2>/dev/null && echo -e "  ${GREEN}✓${RESET} git installed" || echo -e "  ${YELLOW}△${RESET} Could not install git"
+                        ;;
+                esac
+            done
+            echo ""
+        fi
+    fi
 fi
 
 # ─── Check Python packages for summarize ───
