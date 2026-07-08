@@ -14,9 +14,10 @@ No cloud. No API keys. No telemetry.
 # → lsof -ti :3000 | xargs kill -9
 
 ? run
-# → (in a Python project) venv/bin/python3 main_api.py
-# → (in a Node project) npm run dev
-# → (in a Docker project) docker compose up -d
+# → (Python) python3 -m venv venv && venv/bin/pip3 install -r requirements.txt && venv/bin/python3 main_api.py
+# → (Node) npm run dev
+# → (C++) cmake -B build && cmake --build build && ./build/myapp
+# → (Docker) docker compose up -d
 ```
 
 ## Features
@@ -25,8 +26,8 @@ No cloud. No API keys. No telemetry.
 |---------|-------------|
 | `? <query>` | Natural language → shell command (confirm before running) |
 | `? run` / `? test` / `? build` | Context-aware — adapts to your project type |
-| `? setup` | Create venv + install dependencies (auto-detects project) |
-| `recall <keyword>` | Recall previously executed commands |
+| `? setup` | Create venv / cmake build / install deps (auto-detects project) |
+| `recall <keyword>` | Recall previously executed commands from memory |
 | `explain <error>` | Explain an error message |
 | `port <number>` | Show what's using a port |
 | `ai <question>` | Chat with local AI (markdown rendered) |
@@ -34,6 +35,8 @@ No cloud. No API keys. No telemetry.
 | `git-changes` | Explain the intent behind your code changes |
 | `smart-commit` | Generate commit messages from staged changes |
 | `ocr-explain` | Screenshot → OCR → AI explanation |
+| `smart-terminal update` | Pull latest version and reinstall |
+| `smart-terminal --version` | Show installed version |
 
 ## How it works
 
@@ -43,14 +46,16 @@ No cloud. No API keys. No telemetry.
 4. The command is shown for confirmation before execution
 5. Dangerous commands (`rm -rf`, `dd`, etc.) require explicit `y`
 6. **Failed commands are auto-explained** inline — no manual step needed
+7. Every command you run via `?` is **saved to memory** for later recall
 
 ## Requirements
 
 - **macOS 12+** (Apple Silicon or Intel)
 - **[Apfel](https://github.com/Arthur-Ficial/apfel)** — Apple Intelligence CLI (required)
 - **zsh** — default macOS shell (required)
-- **Python 3** — for document summarizer and OCR (optional)
-- **[glow](https://github.com/charmbracelet/glow)** — for rendered markdown output (optional, `brew install glow`)
+- **Python 3** — for document summarizer (optional)
+- **[glow](https://github.com/charmbracelet/glow)** — for rendered markdown output (optional)
+- **Xcode Command Line Tools** — for OCR tool compilation and C/C++ support (optional, `xcode-select --install`)
 
 ## Install
 
@@ -61,7 +66,8 @@ cd smart-terminal
 ```
 
 The installer will:
-- Check all dependencies and tell you what's missing
+- Check all dependencies and offer to install missing ones via Homebrew
+- Compile the native OCR tool (Swift → binary, for fast text extraction)
 - Install files to `~/.smart-terminal/`
 - Link CLI tools (`ai`, `git-changes`, `summarize`, `ocr-explain`) to your PATH
 - Add source lines to your `~/.zshrc`
@@ -72,6 +78,14 @@ Then reload your shell:
 ```bash
 source ~/.zshrc
 ```
+
+## Update
+
+```bash
+smart-terminal update
+```
+
+Pulls the latest version from GitHub and reinstalls automatically.
 
 ## Uninstall
 
@@ -98,24 +112,47 @@ Removes everything cleanly — files, symlinks, and the lines added to `.zshrc`.
 ? mute                               # macOS volume control
 ? dark mode on                       # system preferences
 ? keep mac awake                     # caffeinate
+? generate ssh key
+? empty trash
 ```
 
 ### Context-aware project commands
 
-Smart Terminal detects your project type and runs the right command:
+Smart Terminal detects your project type (Python, Node, C, C++, Rust, Go, Java, Ruby, Docker) and runs the right command:
 
 ```bash
 ? run       # Python: creates venv if needed, installs deps if found, runs entry point
-            # Node: npm run dev  |  Rust: cargo run  |  C/C++: gcc/g++/cmake → run
-            # Docker: docker compose up -d  |  Go: go run .
-? test      # Python: pytest  |  Node: npm test  |  Rust: cargo test  |  C++: ctest
-? build     # Python: python3 -m build  |  Node: npm run build  |  C: gcc  |  C++: cmake/g++
-? setup     # Creates venv + installs deps (or npm install, cmake -B build, cargo fetch, etc.)
+            # Node: npm run dev  |  C: gcc -o a.out main.c && ./a.out
+            # C++: cmake -B build && cmake --build build && ./build/<name>
+            # Rust: cargo run  |  Go: go run .  |  Docker: docker compose up -d
+? test      # Python: pytest  |  Node: npm test  |  Rust: cargo test
+            # C++ (CMake): ctest  |  Go: go test ./...
+? build     # Python: python3 -m build  |  Node: npm run build
+            # C: gcc -o a.out *.c  |  C++: cmake --build build  |  Rust: cargo build
+? setup     # Python: python3 -m venv venv + pip install
+            # Node: npm install  |  C++ (CMake): cmake -B build
+            # Rust: cargo fetch  |  C++ (vcpkg): vcpkg install
 ? lint      # Python: ruff check  |  Node: npm run lint  |  Rust: cargo clippy
+            # C/C++: cppcheck || clang-tidy
 ? format    # Python: ruff format  |  Node: prettier  |  Rust: cargo fmt
+            # C/C++: clang-format
 ? clean     # Removes build artifacts per project type
 ? install   # Installs dependencies for the detected project type
 ```
+
+**Supported project types:**
+
+| Type | Detected by | Run | Build | Setup |
+|------|-------------|-----|-------|-------|
+| Python | `requirements.txt`, `pyproject.toml`, `Pipfile`, or `.py` files | `venv/bin/python3 <entry>` | `python3 -m build` | `python3 -m venv venv && pip install` |
+| Node.js | `package.json` | `npm run dev` / `npm start` | `npm run build` | `npm install` |
+| C | `.c` files | `gcc -o a.out && ./a.out` | `gcc -o a.out *.c` | — |
+| C++ | `CMakeLists.txt` or `.cpp` files | `cmake → build → run` | `cmake --build build` | `cmake -B build` |
+| Rust | `Cargo.toml` | `cargo run` | `cargo build` | `cargo fetch` |
+| Go | `go.mod` | `go run .` | `go build ./...` | `go mod download` |
+| Java | `pom.xml` / `build.gradle` | `./gradlew run` | `./gradlew build` | `./gradlew build` |
+| Ruby | `Gemfile` | `rails server` | — | `bundle install` |
+| Docker | `docker-compose.yml` / `Dockerfile` | `docker compose up -d` | `docker compose build` | `docker compose pull && build` |
 
 **Python entry point detection** (checked in order):
 1. `pyproject.toml` scripts section
@@ -129,7 +166,7 @@ Smart Terminal detects your project type and runs the right command:
 9. Common names: main.py, app.py, main_api.py, server.py
 10. Only `.py` file in directory (if just one, runs it directly)
 
-**Auto venv handling**:
+**Auto venv handling** (Python):
 - No venv + has `requirements.txt` → creates venv, installs deps, runs
 - No venv + has `pyproject.toml` → creates venv, installs with `pip install -e .`, runs
 - No venv + no deps file → creates venv, runs directly (no pip install)
@@ -197,7 +234,7 @@ ocr-explain              # select screen region interactively
 ocr-explain image.png    # OCR an existing image
 ```
 
-Requires macOS 12+ (uses Apple's Vision framework for OCR). Bind to a hotkey with Hammerspoon, Raycast, or Shortcuts — see `extras/hammerspoon-init.lua`.
+Uses a precompiled Swift binary (built during install) with Apple's Vision framework. No Python dependencies needed for OCR.
 
 ### Error explanation
 
@@ -205,6 +242,14 @@ Requires macOS 12+ (uses Apple's Vision framework for OCR). Bind to a hotkey wit
 explain "error: EACCES permission denied"
 some-failing-command 2>&1 | explain
 explain-last   # re-runs last failed command and explains the error
+```
+
+### Meta commands
+
+```bash
+smart-terminal --version    # show installed version
+smart-terminal update       # pull latest + reinstall
+smart-terminal help         # show all available commands
 ```
 
 ## Configuration
@@ -254,29 +299,18 @@ Copy `extras/hammerspoon-init.lua` to your `~/.hammerspoon/init.lua`:
 
 Add `ocr-explain` or `ai` as Script Commands in Raycast preferences.
 
-### macOS Shortcuts (recommended)
-
-Run the setup script to create a Quick Action:
-
-```bash
-cd smart-terminal
-./extras/setup-shortcut.sh
-```
-
-Then assign a hotkey in System Settings → Keyboard → Keyboard Shortcuts → Services → find "OCR Explain" → set `⌃⇧E` (or your preference).
-
 ## Built-in command coverage
 
 The dictionary handles ~250+ patterns across:
 
 - **Navigation** — dynamic path resolution, finds folders anywhere in ~/
-- **Context-aware** — run, test, build, setup, lint, format, clean (adapts to Python, Node, Rust, Go, C, C++, Java, Ruby, Docker)
+- **Context-aware** — run, test, build, setup, lint, format, clean (Python, Node, C, C++, Rust, Go, Java, Ruby, Docker)
 - **Docker** — status, start/stop/restart Desktop app, containers, compose, images, logs, prune, exec, stats
 - **Ports & Networking** — lsof, kill port, IP, public IP, WiFi, DNS, ping, speed test
 - **System** — CPU, RAM, battery, disk, uptime, processes, serial number
 - **Files** — find by type/size/date, grep with location, count, compress, permissions, tree
 - **Git** — full workflow: status, log, diff, branches, stash, push/pull, blame, tags, create/switch/delete branch
-- **Package managers** — brew, npm, pip, venv, cargo
+- **Package managers** — brew, npm, pip, venv, cargo, cmake, vcpkg, conan
 - **Common tasks** — versions, env vars, PATH, history, aliases, node_modules cleanup
 - **macOS** — screenshot, lock, sleep, caffeinate, dark mode, volume, bluetooth, brightness, Finder, trash, hidden files, force quit, apps
 - **SSH** — generate, show, copy key
