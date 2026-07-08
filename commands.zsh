@@ -144,6 +144,9 @@ _st_detect_project() {
     elif [[ -f "pom.xml" ]] || [[ -f "build.gradle" ]]; then echo "java"
     elif [[ -f "Gemfile" ]]; then echo "ruby"
     elif [[ -f "docker-compose.yml" ]] || [[ -f "docker-compose.yaml" ]] || [[ -f "Dockerfile" ]]; then echo "docker"
+    elif [[ -f "CMakeLists.txt" ]]; then echo "cpp"
+    elif () { local f=(*.cpp(N) *.cc(N) *.cxx(N)); (( ${#f} )) }; then echo "cpp"
+    elif () { local f=(*.c(N)); (( ${#f} )) }; then echo "c"
     elif [[ -f "Makefile" ]]; then echo "make"
     elif ls *.py 1>/dev/null 2>&1; then echo "python"
     else echo "unknown"
@@ -344,6 +347,33 @@ _st_lookup_command() {
                 java) echo "./gradlew run 2>/dev/null || mvn exec:java"; return 0 ;;
                 ruby) echo "bundle exec rails server 2>/dev/null || ruby main.rb"; return 0 ;;
                 docker) echo "docker compose up -d"; return 0 ;;
+                c)
+                    # Single .c file → compile and run
+                    local c_files=(*.c(N))
+                    if [[ ${#c_files[@]} -eq 1 ]]; then
+                        echo "gcc -o a.out ${c_files[1]} && ./a.out"
+                    elif [[ -f "main.c" ]]; then
+                        echo "gcc -o main main.c && ./main"
+                    elif [[ -f "Makefile" ]]; then
+                        echo "make && ./a.out"
+                    else
+                        echo "gcc -o a.out *.c && ./a.out"
+                    fi; return 0 ;;
+                cpp)
+                    if [[ -f "CMakeLists.txt" ]]; then
+                        echo "cmake -B build && cmake --build build && ./build/$(basename $(pwd))"
+                    else
+                        local cpp_files=(*.cpp(N) *.cc(N) *.cxx(N))
+                        if [[ ${#cpp_files[@]} -eq 1 ]]; then
+                            echo "g++ -std=c++17 -o a.out ${cpp_files[1]} && ./a.out"
+                        elif [[ -f "main.cpp" ]]; then
+                            echo "g++ -std=c++17 -o main main.cpp && ./main"
+                        elif [[ -f "Makefile" ]]; then
+                            echo "make && ./a.out"
+                        else
+                            echo "g++ -std=c++17 -o a.out *.cpp && ./a.out"
+                        fi
+                    fi; return 0 ;;
                 make) echo "make run"; return 0 ;;
                 *) ;;
             esac ;;
@@ -387,6 +417,16 @@ _st_lookup_command() {
                 java) echo "./gradlew build 2>/dev/null || mvn install"; return 0 ;;
                 ruby) echo "bundle install"; return 0 ;;
                 docker) echo "docker compose pull && docker compose build"; return 0 ;;
+                c|cpp)
+                    if [[ -f "CMakeLists.txt" ]]; then
+                        echo "cmake -B build"
+                    elif [[ -f "vcpkg.json" ]]; then
+                        echo "vcpkg install"
+                    elif [[ -f "conanfile.txt" ]] || [[ -f "conanfile.py" ]]; then
+                        echo "conan install . --build=missing"
+                    else
+                        echo "echo 'Ready to compile. Use: ? build'"
+                    fi; return 0 ;;
                 make) echo "make setup 2>/dev/null || make install 2>/dev/null || make"; return 0 ;;
                 *) ;;
             esac ;;
@@ -398,6 +438,13 @@ _st_lookup_command() {
                 go) echo "go test ./..."; return 0 ;;
                 java) echo "./gradlew test 2>/dev/null || mvn test"; return 0 ;;
                 ruby) echo "bundle exec rspec"; return 0 ;;
+                c) echo "make test 2>/dev/null || echo 'No test target in Makefile'"; return 0 ;;
+                cpp)
+                    if [[ -f "CMakeLists.txt" ]]; then
+                        echo "cmake -B build && cmake --build build && ctest --test-dir build"
+                    else
+                        echo "make test 2>/dev/null || echo 'No test target'"
+                    fi; return 0 ;;
                 make) echo "make test"; return 0 ;;
                 *) ;;
             esac ;;
@@ -408,6 +455,20 @@ _st_lookup_command() {
                 rust) echo "cargo build"; return 0 ;;
                 go) echo "go build ./..."; return 0 ;;
                 java) echo "./gradlew build 2>/dev/null || mvn package"; return 0 ;;
+                c)
+                    if [[ -f "Makefile" ]]; then
+                        echo "make"
+                    else
+                        echo "gcc -o a.out *.c"
+                    fi; return 0 ;;
+                cpp)
+                    if [[ -f "CMakeLists.txt" ]]; then
+                        echo "cmake -B build && cmake --build build"
+                    elif [[ -f "Makefile" ]]; then
+                        echo "make"
+                    else
+                        echo "g++ -std=c++17 -o a.out *.cpp"
+                    fi; return 0 ;;
                 make) echo "make"; return 0 ;;
                 docker) echo "docker compose build"; return 0 ;;
                 *) ;;
@@ -424,6 +485,16 @@ _st_lookup_command() {
                 rust) echo "cargo fetch"; return 0 ;;
                 go) echo "go mod download"; return 0 ;;
                 ruby) echo "bundle install"; return 0 ;;
+                c|cpp)
+                    if [[ -f "CMakeLists.txt" ]]; then
+                        echo "cmake -B build"
+                    elif [[ -f "vcpkg.json" ]]; then
+                        echo "vcpkg install"
+                    elif [[ -f "conanfile.txt" ]] || [[ -f "conanfile.py" ]]; then
+                        echo "conan install . --build=missing"
+                    else
+                        echo "echo 'No package manager config found (CMakeLists.txt, vcpkg.json, or conanfile)'"
+                    fi; return 0 ;;
                 *) ;;
             esac ;;
         "lint"|*"run lint"*|*"check lint"*|*"lint"*"code"*)
@@ -432,6 +503,7 @@ _st_lookup_command() {
                 python) echo "ruff check . 2>/dev/null || flake8 ."; return 0 ;;
                 rust) echo "cargo clippy"; return 0 ;;
                 go) echo "golangci-lint run"; return 0 ;;
+                c|cpp) echo "cppcheck . 2>/dev/null || clang-tidy *.cpp 2>/dev/null || echo 'Install cppcheck or clang-tidy'"; return 0 ;;
                 *) ;;
             esac ;;
         "format"|*"format code"*|*"prettify"*|*"auto format"*)
@@ -440,6 +512,7 @@ _st_lookup_command() {
                 python) echo "ruff format . 2>/dev/null || black ."; return 0 ;;
                 rust) echo "cargo fmt"; return 0 ;;
                 go) echo "gofmt -w ."; return 0 ;;
+                c|cpp) echo "clang-format -i *.c *.h *.cpp *.hpp 2>/dev/null"; return 0 ;;
                 *) ;;
             esac ;;
         "clean"|*"clean project"*|*"clean build"*)
@@ -450,6 +523,14 @@ _st_lookup_command() {
                 go) echo "go clean"; return 0 ;;
                 java) echo "./gradlew clean 2>/dev/null || mvn clean"; return 0 ;;
                 docker) echo "docker compose down --rmi local -v"; return 0 ;;
+                c|cpp)
+                    if [[ -f "CMakeLists.txt" ]]; then
+                        echo "rm -rf build"
+                    elif [[ -f "Makefile" ]]; then
+                        echo "make clean"
+                    else
+                        echo "rm -f a.out *.o"
+                    fi; return 0 ;;
                 make) echo "make clean"; return 0 ;;
                 *) ;;
             esac ;;
