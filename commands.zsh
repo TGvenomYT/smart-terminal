@@ -477,10 +477,31 @@ _st_lookup_command() {
             case "$project_type" in
                 node) echo "npm install"; return 0 ;;
                 python)
-                    if [[ -f "requirements.txt" ]]; then echo "pip3 install -r requirements.txt"
-                    elif [[ -f "pyproject.toml" ]]; then echo "pip3 install -e ."
-                    elif [[ -f "Pipfile" ]]; then echo "pipenv install"
-                    else echo "pip3 install"
+                    if [[ -d "venv" ]]; then
+                        local vd="venv"
+                    elif [[ -d ".venv" ]]; then
+                        local vd=".venv"
+                    elif [[ -d "env" ]]; then
+                        local vd="env"
+                    else
+                        local vd="venv"
+                    fi
+                    if [[ -f "requirements.txt" ]]; then
+                        if [[ -d "$vd" ]]; then
+                            echo "$vd/bin/pip3 install -r requirements.txt"
+                        else
+                            echo "python3 -m venv $vd && $vd/bin/pip3 install -r requirements.txt"
+                        fi
+                    elif [[ -f "pyproject.toml" ]]; then
+                        if [[ -d "$vd" ]]; then
+                            echo "$vd/bin/pip3 install -e ."
+                        else
+                            echo "python3 -m venv $vd && $vd/bin/pip3 install -e ."
+                        fi
+                    elif [[ -f "Pipfile" ]]; then
+                        echo "pipenv install"
+                    else
+                        echo "echo 'No requirements.txt, pyproject.toml, or Pipfile found'"
                     fi; return 0 ;;
                 rust) echo "cargo fetch"; return 0 ;;
                 go) echo "go mod download"; return 0 ;;
