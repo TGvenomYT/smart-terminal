@@ -7,8 +7,6 @@
 #
 # Requires: macOS 12+ (for Vision OCR), apfel, Python 3
 
-set -euo pipefail
-
 CYAN='\033[0;36m'
 DIM='\033[2m'
 RED='\033[0;31m'
@@ -33,16 +31,18 @@ if ! command -v apfel &>/dev/null; then
 fi
 
 IMAGE_PATH=""
+CLEANUP_IMAGE=false
+
 if [[ -n "${1:-}" ]] && [[ -f "$1" ]]; then
     IMAGE_PATH="$1"
 else
-    IMAGE_PATH="/tmp/ocr_capture_$$.png"
-    rm -f "$IMAGE_PATH" 2>/dev/null
+    IMAGE_PATH="/tmp/ocr_capture_$(date +%s)_$$.png"
+    CLEANUP_IMAGE=true
     echo -e "${CYAN}⟩ Select a region to capture...${RESET}" >&2
-    screencapture -i "$IMAGE_PATH"
+    screencapture -i "$IMAGE_PATH" 2>/dev/null
     if [[ ! -s "$IMAGE_PATH" ]]; then
-        echo -e "${DIM}Cancelled.${RESET}" >&2
-        rm -f "$IMAGE_PATH"
+        echo -e "${DIM}Cancelled or capture failed.${RESET}" >&2
+        rm -f "$IMAGE_PATH" 2>/dev/null
         exit 0
     fi
 fi
@@ -50,8 +50,8 @@ fi
 echo -e "${CYAN}⟩ Reading text from image...${RESET}" >&2
 TEXT=$(python3 "$OCR_SCRIPT" "$IMAGE_PATH" 2>/dev/null)
 
-if [[ "$IMAGE_PATH" == /tmp/ocr_capture_* ]]; then
-    rm -f "$IMAGE_PATH"
+if [[ "$CLEANUP_IMAGE" == "true" ]]; then
+    rm -f "$IMAGE_PATH" 2>/dev/null
 fi
 
 if [[ -z "$TEXT" ]]; then
@@ -75,7 +75,7 @@ fi
 
 echo ""
 if command -v glow &>/dev/null; then
-    TMPFILE="/tmp/ocr_explain_$$.md"
+    TMPFILE="/tmp/ocr_explain_$(date +%s).md"
     echo "$EXPLANATION" > "$TMPFILE"
     glow "$TMPFILE"
     rm -f "$TMPFILE"
