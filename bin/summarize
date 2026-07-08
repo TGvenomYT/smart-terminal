@@ -121,7 +121,7 @@ def summarize_text(text, mode="summary", custom_prompt=None):
 
     try:
         result = subprocess.run(
-            ["apfel", "-q", "--permissive", "-s", system, text],
+            ["apfel", "-q", "--permissive", "-s", system, "--", text],
             capture_output=True,
             text=True,
             timeout=60,
