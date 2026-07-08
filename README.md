@@ -105,7 +105,8 @@ Removes everything cleanly — files, symlinks, and the lines added to `.zshrc`.
 Smart Terminal detects your project type and runs the right command:
 
 ```bash
-? run       # Python: venv/bin/python3 <entry>  |  Node: npm run dev  |  Docker: docker compose up -d
+? run       # Python: creates venv if needed, installs deps if found, runs entry point
+            # Node: npm run dev  |  Docker: docker compose up -d  |  Rust: cargo run
 ? test      # Python: pytest  |  Node: npm test  |  Rust: cargo test
 ? build     # Python: python3 -m build  |  Node: npm run build  |  Rust: cargo build
 ? setup     # Creates venv + installs deps (or npm install, cargo fetch, etc.)
@@ -125,8 +126,13 @@ Smart Terminal detects your project type and runs the right command:
 7. `docker-compose.yml` command
 8. Files with `if __name__ == "__main__"`
 9. Common names: main.py, app.py, main_api.py, server.py
+10. Only `.py` file in directory (if just one, runs it directly)
 
-**Auto venv handling**: If no virtual environment exists, `? run` creates one and installs dependencies automatically using `venv/bin/pip3`.
+**Auto venv handling**:
+- No venv + has `requirements.txt` → creates venv, installs deps, runs
+- No venv + has `pyproject.toml` → creates venv, installs with `pip install -e .`, runs
+- No venv + no deps file → creates venv, runs directly (no pip install)
+- Venv already exists → runs with `venv/bin/python3` directly
 
 ### Command memory
 
