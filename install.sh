@@ -248,6 +248,18 @@ cp "$SCRIPT_DIR/commands.zsh" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/system-prompt.txt" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/ocr.py" "$INSTALL_DIR/"
 
+# Compile OCR tool (Swift → native binary for fast OCR)
+if command -v swiftc &>/dev/null; then
+    echo -e "  ${DIM}Compiling OCR tool...${RESET}"
+    if swiftc -O -o "$INSTALL_DIR/bin/ocr-tool" "$SCRIPT_DIR/ocr-tool.swift" 2>/dev/null; then
+        echo -e "  ${GREEN}✓${RESET} OCR tool compiled"
+    else
+        echo -e "  ${YELLOW}△${RESET} OCR tool compilation failed (will use slower Swift fallback)"
+    fi
+else
+    echo -e "  ${YELLOW}△${RESET} swiftc not found (ocr-explain will use slower fallback)"
+fi
+
 # Only copy config if it doesn't exist (don't overwrite user config)
 if [[ ! -f "$INSTALL_DIR/config.zsh" ]]; then
     cp "$SCRIPT_DIR/config.zsh" "$INSTALL_DIR/"
