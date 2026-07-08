@@ -300,13 +300,53 @@ _st_lookup_command() {
         "run"|*"run project"*|*"run app"*|*"start app"*|*"run server"*|*"start server"*|*"run this"*)
             case "$project_type" in
                 node) _st_find_node_entry; return 0 ;;
-                python) _st_find_python_entry; return 0 ;;
+                python)
+                    local entry=$(_st_find_python_entry)
+                    # Check if venv exists, if not set up first
+                    if [[ ! -d "venv" ]] && [[ ! -d ".venv" ]] && [[ ! -d "env" ]]; then
+                        # No virtual env found — create and install deps first
+                        local install_cmd="pip3 install -r requirements.txt"
+                        [[ -f "pyproject.toml" ]] && install_cmd="pip3 install -e ."
+                        [[ -f "Pipfile" ]] && install_cmd="pipenv install"
+                        echo "python3 -m venv venv && source venv/bin/activate && $install_cmd && $entry"
+                    elif [[ -d "venv" ]]; then
+                        echo "source venv/bin/activate && $entry"
+                    elif [[ -d ".venv" ]]; then
+                        echo "source .venv/bin/activate && $entry"
+                    elif [[ -d "env" ]]; then
+                        echo "source env/bin/activate && $entry"
+                    else
+                        echo "$entry"
+                    fi; return 0 ;;
                 rust) echo "cargo run"; return 0 ;;
                 go) echo "go run ."; return 0 ;;
                 java) echo "./gradlew run 2>/dev/null || mvn exec:java"; return 0 ;;
                 ruby) echo "bundle exec rails server 2>/dev/null || ruby main.rb"; return 0 ;;
                 docker) echo "docker compose up -d"; return 0 ;;
                 make) echo "make run"; return 0 ;;
+                *) ;;
+            esac ;;
+        "setup"|*"setup project"*|*"set up"*|*"init project"*|*"initialize"*)
+            case "$project_type" in
+                node) echo "npm install"; return 0 ;;
+                python)
+                    local install_cmd="pip3 install -r requirements.txt"
+                    [[ -f "pyproject.toml" ]] && install_cmd="pip3 install -e ."
+                    [[ -f "Pipfile" ]] && install_cmd="pipenv install"
+                    if [[ -d "venv" ]] || [[ -d ".venv" ]] || [[ -d "env" ]]; then
+                        local venv_dir="venv"
+                        [[ -d ".venv" ]] && venv_dir=".venv"
+                        [[ -d "env" ]] && venv_dir="env"
+                        echo "source $venv_dir/bin/activate && $install_cmd"
+                    else
+                        echo "python3 -m venv venv && source venv/bin/activate && $install_cmd"
+                    fi; return 0 ;;
+                rust) echo "cargo fetch"; return 0 ;;
+                go) echo "go mod download"; return 0 ;;
+                java) echo "./gradlew build 2>/dev/null || mvn install"; return 0 ;;
+                ruby) echo "bundle install"; return 0 ;;
+                docker) echo "docker compose pull && docker compose build"; return 0 ;;
+                make) echo "make setup 2>/dev/null || make install 2>/dev/null || make"; return 0 ;;
                 *) ;;
             esac ;;
         "test"|*"run test"*|*"run the test"*|*"execute test"*)
