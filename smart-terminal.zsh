@@ -371,6 +371,16 @@ function recall() {
     fi
 }
 
+# Tab completion for recall — completes from command history keywords
+_st_recall_completion() {
+    if [[ -f "$_ST_MEMORY_FILE" ]]; then
+        local -a words
+        words=(${(f)"$(cut -d'|' -f2 "$_ST_MEMORY_FILE" 2>/dev/null | tr ' ' '\n' | sort -u | grep -v '^$')"})
+        compadd -a words
+    fi
+}
+compdef _st_recall_completion recall
+
 # ─────────────────────────────────────────────────────────────
 # Register hooks
 # ─────────────────────────────────────────────────────────────
@@ -382,6 +392,77 @@ add-zsh-hook precmd _st_precmd
 # Alias: ? → ask (noglob prevents zsh from treating ? as a glob)
 # ─────────────────────────────────────────────────────────────
 alias '?'='noglob ask'
+
+# ─────────────────────────────────────────────────────────────
+# 7. Smart Terminal meta commands
+# ─────────────────────────────────────────────────────────────
+function smart-terminal() {
+    local version=$(cat "${SMART_TERMINAL_DIR}/VERSION" 2>/dev/null || echo "unknown")
+    case "${1:-}" in
+        --version|-v|version)
+            echo "smart-terminal v${version}"
+            ;;
+        update)
+            echo "${ST_CYAN}⟩ Updating Smart Terminal...${ST_RESET}"
+            local repo_dir=""
+            # Find the git repo
+            if [[ -d "${SMART_TERMINAL_DIR}/.git" ]]; then
+                repo_dir="${SMART_TERMINAL_DIR}"
+            else
+                # Search for the cloned repo
+                repo_dir=$(find "$HOME" -maxdepth 4 -type d -name "smart-terminal" -path "*/.git/.." 2>/dev/null | head -1)
+                if [[ -z "$repo_dir" ]]; then
+                    repo_dir=$(find "$HOME" -maxdepth 4 -type d -name "smart-terminal" 2>/dev/null | while read d; do [[ -d "$d/.git" ]] && echo "$d" && break; done)
+                fi
+            fi
+            if [[ -z "$repo_dir" ]] || [[ ! -d "$repo_dir/.git" ]]; then
+                echo "${ST_RED}✗ Could not find smart-terminal git repo.${ST_RESET}"
+                echo "${ST_DIM}Clone it first: git clone https://github.com/TGvenomYT/smart-terminal.git${ST_RESET}"
+                return 1
+            fi
+            echo "${ST_DIM}  Pulling latest from $repo_dir...${ST_RESET}"
+            (cd "$repo_dir" && git pull 2>&1) || {
+                echo "${ST_RED}✗ git pull failed${ST_RESET}"
+                return 1
+            }
+            echo "${ST_DIM}  Reinstalling...${ST_RESET}"
+            (cd "$repo_dir" && ./install.sh)
+            echo ""
+            echo "${ST_GREEN}✓ Updated to v$(cat "${SMART_TERMINAL_DIR}/VERSION" 2>/dev/null || echo "?")${ST_RESET}"
+            echo "${ST_DIM}Reload your shell: source ~/.zshrc${ST_RESET}"
+            ;;
+        help|--help|-h|"")
+            local v=$(cat "${SMART_TERMINAL_DIR}/VERSION" 2>/dev/null || echo "?")
+            echo "smart-terminal v${v} — Local AI-powered shell for macOS"
+            echo ""
+            echo "Commands:"
+            echo "  smart-terminal --version    Show version"
+            echo "  smart-terminal update       Pull latest and reinstall"
+            echo "  smart-terminal help         Show this help"
+            echo ""
+            echo "Shell commands:"
+            echo "  ? <query>                   Natural language → shell command"
+            echo "  ask <query>                 Same as ?"
+            echo "  recall [keyword]            Recall previous commands"
+            echo "  explain <error>             Explain an error"
+            echo "  explain-last                Explain the last failed command"
+            echo "  port <number>               Check what's using a port"
+            echo "  smart-commit                Generate git commit message"
+            echo "  what-did-i-do [since]       Summarize git activity"
+            echo ""
+            echo "CLI tools:"
+            echo "  ai [question]               Chat with local AI"
+            echo "  summarize <file>            Summarize a document"
+            echo "  git-changes [mode]          Explain code changes"
+            echo "  ocr-explain [image]         Screenshot → OCR → explain"
+            ;;
+        *)
+            echo "${ST_RED}Unknown command: $1${ST_RESET}"
+            echo "${ST_DIM}Run 'smart-terminal help' for usage.${ST_RESET}"
+            return 1
+            ;;
+    esac
+}
 
 # ─────────────────────────────────────────────────────────────
 # Startup
