@@ -33,7 +33,7 @@ _st_find_folder() {
     fi
 
     # 2. Check subdirectories of common parent folders
-    local search_dirs=("$HOME" "$HOME/Projects" "$HOME/Developer" "$HOME/Documents" "$HOME/Desktop")
+    local search_dirs=("$HOME" "$HOME/Projects" "$HOME/Developer" "$HOME/Documents" "$HOME/Desktop" "$HOME/Documents/Projects" "$HOME/Documents/projects")
     for dir in "${search_dirs[@]}"; do
         if [[ -d "$dir" ]]; then
             # Exact match (case-insensitive)
@@ -201,6 +201,9 @@ _st_lookup_command() {
         if [[ -n "$resolved" ]]; then
             echo "cd $resolved"; return 0
         fi
+        # Single word that looks like a folder name but not found — don't fall through
+        # to avoid false matches like "smart-terminal" hitting "rm" pattern
+        echo "cd ~/$q"; return 0
     fi
 
     # "open here" / "open ." / "open current"
@@ -550,11 +553,11 @@ _st_lookup_command() {
             echo "du -sh"; return 0 ;;
         *"disk usage"*|*"disk space"*)
             echo "df -h /"; return 0 ;;
-        *"rename"*"file"*|*"mv"*)
+        *"rename"*"file"*|"mv "*)
             echo "mv"; return 0 ;;
-        *"copy"*"file"*|*"cp"*)
+        *"copy"*"file"*|"cp "*)
             echo "cp"; return 0 ;;
-        *"remove"*"file"*|*"delete"*"file"*|*"rm"*)
+        *"remove"*"file"*|*"delete"*"file"*|"rm "*)
             echo "rm"; return 0 ;;
         *"create"*"file"*|*"touch"*|*"new file"*)
             echo "touch"; return 0 ;;
