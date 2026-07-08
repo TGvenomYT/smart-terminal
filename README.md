@@ -247,9 +247,16 @@ Copy `extras/hammerspoon-init.lua` to your `~/.hammerspoon/init.lua`:
 
 Add `ocr-explain` or `ai` as Script Commands in Raycast preferences.
 
-### macOS Shortcuts
+### macOS Shortcuts (recommended)
 
-Create a Shortcut with "Run Shell Script" action pointing to `~/.smart-terminal/bin/ocr-explain`.
+Run the setup script to create a Quick Action:
+
+```bash
+cd smart-terminal
+./extras/setup-shortcut.sh
+```
+
+Then assign a hotkey in System Settings → Keyboard → Keyboard Shortcuts → Services → find "OCR Explain" → set `⌃⇧E` (or your preference).
 
 ## Built-in command coverage
 
