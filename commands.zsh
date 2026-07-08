@@ -264,6 +264,18 @@ _st_find_python_entry() {
         fi
     done
 
+    # 11. If only one .py file exists, just run it
+    local all_py=(*.py(N))
+    # Filter out test/setup files
+    local candidate_py=()
+    for f in "${all_py[@]}"; do
+        [[ "$f" == test_* ]] || [[ "$f" == *_test.py ]] || [[ "$f" == setup.py ]] || [[ "$f" == conftest.py ]] && continue
+        candidate_py+=("$f")
+    done
+    if [[ ${#candidate_py[@]} -eq 1 ]]; then
+        echo "python3 ${candidate_py[1]}"; return 0
+    fi
+
     echo "python3 ."; return 0
 }
 
