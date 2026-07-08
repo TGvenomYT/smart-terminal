@@ -149,6 +149,99 @@ _st_detect_project() {
     fi
 }
 
+# Smart entry point finder for Python projects
+_st_find_python_entry() {
+    # 1. Check pyproject.toml for scripts
+    if [[ -f "pyproject.toml" ]]; then
+        local script=$(grep -A5 '\[project.scripts\]' pyproject.toml 2>/dev/null | grep '=' | head -1 | cut -d'=' -f1 | tr -d ' ')
+        if [[ -n "$script" ]]; then
+            echo "$script"; return 0
+        fi
+    fi
+
+    # 2. Check Makefile for a run target
+    if [[ -f "Makefile" ]]; then
+        if grep -q '^run:' Makefile 2>/dev/null; then
+            echo "make run"; return 0
+        fi
+    fi
+
+    # 3. Check Procfile
+    if [[ -f "Procfile" ]]; then
+        local cmd=$(grep '^web:' Procfile 2>/dev/null | cut -d':' -f2- | sed 's/^ //')
+        if [[ -n "$cmd" ]]; then
+            echo "$cmd"; return 0
+        fi
+    fi
+
+    # 4. Scan for files with if __name__ == "__main__"
+    local main_files=()
+    for f in *.py **/*.py; do
+        [[ -f "$f" ]] || continue
+        # Skip test files, setup files, __init__
+        [[ "$f" == test_* ]] || [[ "$f" == *test*.py ]] || [[ "$f" == setup.py ]] || [[ "$f" == conftest.py ]] || [[ "$f" == __* ]] && continue
+        if grep -q '__name__.*__main__\|if __name__' "$f" 2>/dev/null; then
+            main_files+=("$f")
+        fi
+    done
+
+    # If exactly one main file found, use it
+    if [[ ${#main_files[@]} -eq 1 ]]; then
+        echo "python3 ${main_files[1]}"; return 0
+    fi
+
+    # If multiple, prefer common names
+    for name in main.py app.py server.py run.py cli.py; do
+        for f in "${main_files[@]}"; do
+            if [[ "$(basename $f)" == "$name" ]]; then
+                echo "python3 $f"; return 0
+            fi
+        done
+    done
+
+    # If still multiple, use the first one (usually top-level)
+    if [[ ${#main_files[@]} -gt 0 ]]; then
+        echo "python3 ${main_files[1]}"; return 0
+    fi
+
+    # 5. Fallback: check for common entry point names
+    for f in main.py app.py server.py run.py manage.py cli.py; do
+        if [[ -f "$f" ]]; then
+            echo "python3 $f"; return 0
+        fi
+    done
+
+    # 6. Check subdirectories one level deep
+    for f in */main.py */app.py */cli.py; do
+        if [[ -f "$f" ]]; then
+            echo "python3 $f"; return 0
+        fi
+    done
+
+    echo "python3 ."; return 0
+}
+
+# Smart entry point for Node.js projects
+_st_find_node_entry() {
+    # 1. Check package.json scripts
+    if [[ -f "package.json" ]]; then
+        # Check for dev script
+        if grep -q '"dev"' package.json 2>/dev/null; then
+            echo "npm run dev"; return 0
+        fi
+        # Check for start script
+        if grep -q '"start"' package.json 2>/dev/null; then
+            echo "npm start"; return 0
+        fi
+        # Check main field
+        local main_file=$(grep '"main"' package.json 2>/dev/null | head -1 | cut -d'"' -f4)
+        if [[ -n "$main_file" ]] && [[ -f "$main_file" ]]; then
+            echo "node $main_file"; return 0
+        fi
+    fi
+    echo "npm start"; return 0
+}
+
 # ─── MAIN LOOKUP FUNCTION ───
 
 _st_lookup_command() {
@@ -161,13 +254,8 @@ _st_lookup_command() {
     case "$q" in
         "run"|*"run project"*|*"run app"*|*"start app"*|*"run server"*|*"start server"*|*"run this"*)
             case "$project_type" in
-                node) echo "npm run dev"; return 0 ;;
-                python)
-                    if [[ -f "manage.py" ]]; then echo "python3 manage.py runserver"
-                    elif [[ -f "app.py" ]]; then echo "python3 app.py"
-                    elif [[ -f "main.py" ]]; then echo "python3 main.py"
-                    else echo "python3 ."
-                    fi; return 0 ;;
+                node) _st_find_node_entry; return 0 ;;
+                python) _st_find_python_entry; return 0 ;;
                 rust) echo "cargo run"; return 0 ;;
                 go) echo "go run ."; return 0 ;;
                 java) echo "./gradlew run 2>/dev/null || mvn exec:java"; return 0 ;;
