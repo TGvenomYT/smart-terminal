@@ -1,3 +1,0 @@
-#!/bin/bash
-# OCR Explain launcher — opens Terminal and runs ocr-explain
-osascript -e 'tell application "Terminal"' -e 'activate' -e 'do script "$HOME/.smart-terminal/bin/ocr-explain"' -e 'end tell'

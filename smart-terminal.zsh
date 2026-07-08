@@ -371,14 +371,7 @@ function recall() {
     fi
 }
 
-# Tab completion for recall — completes from command history keywords
-_st_recall_completion() {
-    if [[ -f "$_ST_MEMORY_FILE" ]]; then
-        local -a words
-        words=(${(f)"$(cut -d'|' -f2 "$_ST_MEMORY_FILE" 2>/dev/null | tr ' ' '\n' | sort -u | grep -v '^$')"})
-        compadd -a words
-    fi
-}
+
 # ─────────────────────────────────────────────────────────────
 # Register hooks
 # ─────────────────────────────────────────────────────────────
@@ -386,17 +379,7 @@ autoload -Uz add-zsh-hook
 add-zsh-hook preexec _st_preexec
 add-zsh-hook precmd _st_precmd
 
-if (( $+functions[compdef] )); then
-    compdef _st_recall_completion recall
-else
-    # Defer until compinit is loaded
-    autoload -Uz compinit
-    _st_deferred_compdef() {
-        compdef _st_recall_completion recall
-        add-zsh-hook -d precmd _st_deferred_compdef
-    }
-    add-zsh-hook precmd _st_deferred_compdef
-fi
+
 
 # ─────────────────────────────────────────────────────────────
 # Alias: ? → ask (noglob prevents zsh from treating ? as a glob)
