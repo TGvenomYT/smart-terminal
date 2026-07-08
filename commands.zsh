@@ -145,6 +145,7 @@ _st_detect_project() {
     elif [[ -f "Gemfile" ]]; then echo "ruby"
     elif [[ -f "docker-compose.yml" ]] || [[ -f "docker-compose.yaml" ]] || [[ -f "Dockerfile" ]]; then echo "docker"
     elif [[ -f "Makefile" ]]; then echo "make"
+    elif ls *.py 1>/dev/null 2>&1; then echo "python"
     else echo "unknown"
     fi
 }
@@ -315,15 +316,20 @@ _st_lookup_command() {
                 node) _st_find_node_entry; return 0 ;;
                 python)
                     local entry=$(_st_find_python_entry)
-                    # Extract just the filename from entry (e.g., "python3 main_api.py" → "main_api.py")
                     local py_file="${entry#python3 }"
-                    # Check if venv exists, if not set up first
                     if [[ ! -d "venv" ]] && [[ ! -d ".venv" ]] && [[ ! -d "env" ]]; then
                         local venv_dir="venv"
-                        local install_cmd="$venv_dir/bin/pip3 install -r requirements.txt"
-                        [[ -f "pyproject.toml" ]] && install_cmd="$venv_dir/bin/pip3 install -e ."
-                        [[ -f "Pipfile" ]] && install_cmd="pipenv install"
-                        echo "python3 -m venv $venv_dir && $install_cmd && $venv_dir/bin/python3 $py_file"
+                        # Only install deps if a dependency file exists
+                        if [[ -f "requirements.txt" ]]; then
+                            echo "python3 -m venv $venv_dir && $venv_dir/bin/pip3 install -r requirements.txt && $venv_dir/bin/python3 $py_file"
+                        elif [[ -f "pyproject.toml" ]]; then
+                            echo "python3 -m venv $venv_dir && $venv_dir/bin/pip3 install -e . && $venv_dir/bin/python3 $py_file"
+                        elif [[ -f "Pipfile" ]]; then
+                            echo "pipenv install && pipenv run python3 $py_file"
+                        else
+                            # No deps file — just create venv and run
+                            echo "python3 -m venv $venv_dir && $venv_dir/bin/python3 $py_file"
+                        fi
                     elif [[ -d "venv" ]]; then
                         echo "venv/bin/python3 $py_file"
                     elif [[ -d ".venv" ]]; then
@@ -354,13 +360,27 @@ _st_lookup_command() {
                     else
                         local vd="venv"
                     fi
-                    local install_cmd="$vd/bin/pip3 install -r requirements.txt"
-                    [[ -f "pyproject.toml" ]] && install_cmd="$vd/bin/pip3 install -e ."
-                    [[ -f "Pipfile" ]] && install_cmd="pipenv install"
-                    if [[ -d "$vd" ]]; then
-                        echo "$install_cmd"
+                    if [[ -f "requirements.txt" ]]; then
+                        local install_cmd="$vd/bin/pip3 install -r requirements.txt"
+                    elif [[ -f "pyproject.toml" ]]; then
+                        local install_cmd="$vd/bin/pip3 install -e ."
+                    elif [[ -f "Pipfile" ]]; then
+                        local install_cmd="pipenv install"
                     else
-                        echo "python3 -m venv $vd && $install_cmd"
+                        local install_cmd=""
+                    fi
+                    if [[ -d "$vd" ]]; then
+                        if [[ -n "$install_cmd" ]]; then
+                            echo "$install_cmd"
+                        else
+                            echo "echo 'No requirements.txt, pyproject.toml, or Pipfile found'"
+                        fi
+                    else
+                        if [[ -n "$install_cmd" ]]; then
+                            echo "python3 -m venv $vd && $install_cmd"
+                        else
+                            echo "python3 -m venv $vd"
+                        fi
                     fi; return 0 ;;
                 rust) echo "cargo fetch"; return 0 ;;
                 go) echo "go mod download"; return 0 ;;
