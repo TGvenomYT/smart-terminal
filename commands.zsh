@@ -302,19 +302,21 @@ _st_lookup_command() {
                 node) _st_find_node_entry; return 0 ;;
                 python)
                     local entry=$(_st_find_python_entry)
+                    # Extract just the filename from entry (e.g., "python3 main_api.py" → "main_api.py")
+                    local py_file="${entry#python3 }"
                     # Check if venv exists, if not set up first
                     if [[ ! -d "venv" ]] && [[ ! -d ".venv" ]] && [[ ! -d "env" ]]; then
-                        # No virtual env found — create and install deps first
-                        local install_cmd="pip3 install -r requirements.txt"
-                        [[ -f "pyproject.toml" ]] && install_cmd="pip3 install -e ."
+                        local venv_dir="venv"
+                        local install_cmd="$venv_dir/bin/pip3 install -r requirements.txt"
+                        [[ -f "pyproject.toml" ]] && install_cmd="$venv_dir/bin/pip3 install -e ."
                         [[ -f "Pipfile" ]] && install_cmd="pipenv install"
-                        echo "python3 -m venv venv && source venv/bin/activate && $install_cmd && $entry"
+                        echo "python3 -m venv $venv_dir && $install_cmd && $venv_dir/bin/python3 $py_file"
                     elif [[ -d "venv" ]]; then
-                        echo "source venv/bin/activate && $entry"
+                        echo "venv/bin/python3 $py_file"
                     elif [[ -d ".venv" ]]; then
-                        echo "source .venv/bin/activate && $entry"
+                        echo ".venv/bin/python3 $py_file"
                     elif [[ -d "env" ]]; then
-                        echo "source env/bin/activate && $entry"
+                        echo "env/bin/python3 $py_file"
                     else
                         echo "$entry"
                     fi; return 0 ;;
@@ -330,16 +332,22 @@ _st_lookup_command() {
             case "$project_type" in
                 node) echo "npm install"; return 0 ;;
                 python)
-                    local install_cmd="pip3 install -r requirements.txt"
-                    [[ -f "pyproject.toml" ]] && install_cmd="pip3 install -e ."
-                    [[ -f "Pipfile" ]] && install_cmd="pipenv install"
-                    if [[ -d "venv" ]] || [[ -d ".venv" ]] || [[ -d "env" ]]; then
-                        local venv_dir="venv"
-                        [[ -d ".venv" ]] && venv_dir=".venv"
-                        [[ -d "env" ]] && venv_dir="env"
-                        echo "source $venv_dir/bin/activate && $install_cmd"
+                    if [[ -d "venv" ]]; then
+                        local vd="venv"
+                    elif [[ -d ".venv" ]]; then
+                        local vd=".venv"
+                    elif [[ -d "env" ]]; then
+                        local vd="env"
                     else
-                        echo "python3 -m venv venv && source venv/bin/activate && $install_cmd"
+                        local vd="venv"
+                    fi
+                    local install_cmd="$vd/bin/pip3 install -r requirements.txt"
+                    [[ -f "pyproject.toml" ]] && install_cmd="$vd/bin/pip3 install -e ."
+                    [[ -f "Pipfile" ]] && install_cmd="pipenv install"
+                    if [[ -d "$vd" ]]; then
+                        echo "$install_cmd"
+                    else
+                        echo "python3 -m venv $vd && $install_cmd"
                     fi; return 0 ;;
                 rust) echo "cargo fetch"; return 0 ;;
                 go) echo "go mod download"; return 0 ;;
