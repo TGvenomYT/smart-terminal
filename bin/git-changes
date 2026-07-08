@@ -1,0 +1,160 @@
+#!/bin/bash
+# git-changes — Summarize your actual code changes using local AI
+#
+# Usage:
+#   git-changes              # uncommitted changes (staged + unstaged)
+#   git-changes staged       # only staged changes
+#   git-changes last         # last commit
+#   git-changes last 3       # last 3 commits
+#   git-changes today        # everything you committed today
+#   git-changes week         # everything this week
+#   git-changes <hash>       # specific commit
+#   git-changes <hash1>..<hash2>  # range
+
+set -euo pipefail
+
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+DIM='\033[2m'
+RED='\033[0;31m'
+RESET='\033[0m'
+
+# Check we're in a git repo
+if ! git rev-parse --git-dir &>/dev/null 2>&1; then
+    echo -e "${RED}✗ Not a git repository${RESET}" >&2
+    exit 1
+fi
+
+# Check apfel
+if ! command -v apfel &>/dev/null; then
+    echo -e "${RED}✗ apfel not found. Install from: https://github.com/Arthur-Ficial/apfel${RESET}" >&2
+    exit 1
+fi
+
+MODE="${1:-working}"
+COUNT="${2:-1}"
+
+# Help
+if [[ "$MODE" == "-h" ]] || [[ "$MODE" == "--help" ]]; then
+    echo "git-changes — Summarize your code changes using local AI"
+    echo ""
+    echo "Usage:"
+    echo "  git-changes              # uncommitted changes (staged + unstaged)"
+    echo "  git-changes staged       # only staged changes"
+    echo "  git-changes last         # last commit"
+    echo "  git-changes last 3       # last 3 commits"
+    echo "  git-changes today        # everything you committed today"
+    echo "  git-changes week         # everything this week"
+    echo "  git-changes <hash>       # specific commit"
+    echo "  git-changes <h1>..<h2>   # range of commits"
+    exit 0
+fi
+
+get_diff() {
+    case "$MODE" in
+        working|uncommitted|changes)
+            local diff
+            diff=$(git diff HEAD 2>/dev/null)
+            if [[ -z "$diff" ]]; then
+                diff=$(git diff 2>/dev/null)
+            fi
+            if [[ -z "$diff" ]]; then
+                diff=$(git diff --cached 2>/dev/null)
+            fi
+            echo "$diff"
+            ;;
+        staged|cached)
+            git diff --cached
+            ;;
+        unstaged)
+            git diff
+            ;;
+        last)
+            local total_commits
+            total_commits=$(git rev-list --count HEAD 2>/dev/null || echo "0")
+            if [[ "$COUNT" -ge "$total_commits" ]]; then
+                git diff $(git rev-list --max-parents=0 HEAD)..HEAD
+            else
+                git diff HEAD~"$COUNT"..HEAD
+            fi
+            ;;
+        today)
+            local first_today
+            first_today=$(git log --since="midnight" --reverse --format="%H" | head -1)
+            if [[ -n "$first_today" ]]; then
+                git diff "$first_today"^..HEAD 2>/dev/null || git diff "$first_today"..HEAD
+            fi
+            ;;
+        week)
+            local first_week
+            first_week=$(git log --since="1 week ago" --reverse --format="%H" | head -1)
+            if [[ -n "$first_week" ]]; then
+                git diff "$first_week"^..HEAD 2>/dev/null || git diff "$first_week"..HEAD
+            fi
+            ;;
+        *)
+            if [[ "$MODE" == *".."* ]]; then
+                git diff "$MODE"
+            else
+                git diff "$MODE"^.."$MODE"
+            fi
+            ;;
+    esac
+}
+
+# Get the diff
+echo -e "${CYAN}⟩ Gathering changes...${RESET}" >&2
+DIFF=$(get_diff)
+
+if [[ -z "$DIFF" ]]; then
+    echo -e "${DIM}No changes found.${RESET}"
+    exit 0
+fi
+
+# Get stats
+FILES_CHANGED=$(echo "$DIFF" | grep -c '^diff --git' || echo "0")
+LINES_ADDED=$(echo "$DIFF" | grep -c '^+[^+]' || echo "0")
+LINES_REMOVED=$(echo "$DIFF" | grep -c '^-[^-]' || echo "0")
+
+# Truncate diff for the small model's context window
+MAX_CHARS=5000
+TRUNCATED=""
+if [[ ${#DIFF} -gt $MAX_CHARS ]]; then
+    DIFF="${DIFF:0:$MAX_CHARS}"
+    TRUNCATED=" (diff truncated to fit context window)"
+fi
+
+SYSTEM="You are a senior developer explaining code changes to a teammate. Look at this diff and explain the PURPOSE and REASONING behind the changes — not what was added or removed line by line (they can see that themselves). Answer: What problem was being solved? What feature was being built? What was the motivation? Why were these specific approaches chosen? Keep it conversational and concise, like a quick verbal explanation. 3-5 sentences max unless the change is large."
+
+PROMPT="Files changed: $FILES_CHANGED | Lines added: $LINES_ADDED | Lines removed: $LINES_REMOVED${TRUNCATED}
+
+Diff:
+$DIFF"
+
+# Summarize
+echo -e "${CYAN}⟩ Summarizing $FILES_CHANGED files (+$LINES_ADDED/-$LINES_REMOVED)...${RESET}" >&2
+echo ""
+
+RESULT=$(echo "$PROMPT" | apfel -q --permissive -s "$SYSTEM" 2>/dev/null)
+
+if [[ -z "$RESULT" ]]; then
+    echo -e "${RED}✗ Could not generate summary${RESET}" >&2
+    exit 1
+fi
+
+# Render markdown if glow is available
+if command -v glow &>/dev/null; then
+    TMPFILE=$(mktemp /tmp/git_changes_XXXXXX.md)
+    echo "$RESULT" > "$TMPFILE"
+    glow "$TMPFILE"
+    rm -f "$TMPFILE"
+else
+    echo "$RESULT"
+fi
+
+# Show file list
+echo ""
+echo -e "${DIM}Files:${RESET}"
+echo "$DIFF" | grep '^diff --git' | sed 's|diff --git a/||;s| b/.*||' | while read -r f; do
+    echo -e "  ${DIM}$f${RESET}"
+done

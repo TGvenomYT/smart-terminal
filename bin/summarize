@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""
+summarize — Extract text from documents and summarize using apfel (local LLM).
+Supports: PDF, DOCX, XLSX, PPTX, TXT, MD, CSV
+"""
+
+import sys
+import os
+import subprocess
+import shutil
+import argparse
+import tempfile
+from pathlib import Path
+
+
+def extract_pdf(filepath):
+    """Extract text from PDF using pdfplumber."""
+    import pdfplumber
+    text_parts = []
+    with pdfplumber.open(filepath) as pdf:
+        for i, page in enumerate(pdf.pages):
+            page_text = page.extract_text()
+            if page_text:
+                text_parts.append(f"[Page {i+1}]\n{page_text}")
+    return "\n\n".join(text_parts)
+
+
+def extract_docx(filepath):
+    """Extract text from Word documents."""
+    import docx
+    doc = docx.Document(filepath)
+    text_parts = []
+    for para in doc.paragraphs:
+        if para.text.strip():
+            text_parts.append(para.text)
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = " | ".join(cell.text.strip() for cell in row.cells)
+            if row_text.strip(" |"):
+                text_parts.append(row_text)
+    return "\n".join(text_parts)
+
+
+def extract_xlsx(filepath):
+    """Extract text from Excel spreadsheets."""
+    import openpyxl
+    wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
+    text_parts = []
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        text_parts.append(f"[Sheet: {sheet_name}]")
+        for row in ws.iter_rows(values_only=True):
+            row_text = " | ".join(str(cell) if cell is not None else "" for cell in row)
+            if row_text.strip(" |"):
+                text_parts.append(row_text)
+    wb.close()
+    return "\n".join(text_parts)
+
+
+def extract_pptx(filepath):
+    """Extract text from PowerPoint presentations."""
+    from pptx import Presentation
+    prs = Presentation(filepath)
+    text_parts = []
+    for i, slide in enumerate(prs.slides):
+        slide_texts = []
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for para in shape.text_frame.paragraphs:
+                    if para.text.strip():
+                        slide_texts.append(para.text)
+            if shape.has_table:
+                for row in shape.table.rows:
+                    row_text = " | ".join(cell.text.strip() for cell in row.cells)
+                    if row_text.strip(" |"):
+                        slide_texts.append(row_text)
+        if slide_texts:
+            text_parts.append(f"[Slide {i+1}]\n" + "\n".join(slide_texts))
+    return "\n\n".join(text_parts)
+
+
+def extract_text_file(filepath):
+    """Read plain text, markdown, or CSV files."""
+    with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        return f.read()
+
+
+EXTRACTORS = {
+    ".pdf": extract_pdf,
+    ".docx": extract_docx,
+    ".doc": extract_docx,
+    ".xlsx": extract_xlsx,
+    ".xls": extract_xlsx,
+    ".pptx": extract_pptx,
+    ".ppt": extract_pptx,
+    ".txt": extract_text_file,
+    ".md": extract_text_file,
+    ".csv": extract_text_file,
+    ".json": extract_text_file,
+    ".log": extract_text_file,
+}
+
+
+def summarize_text(text, mode="summary", custom_prompt=None):
+    """Send extracted text to apfel for summarization."""
+    if custom_prompt:
+        system = custom_prompt
+    elif mode == "bullets":
+        system = "Summarize the following document as concise bullet points. Focus on key facts, decisions, and action items. Output only the bullet points."
+    elif mode == "tldr":
+        system = "Give a 2-3 sentence TL;DR of this document. Be extremely concise."
+    elif mode == "actions":
+        system = "Extract all action items, tasks, and next steps from this document. Output as a numbered list. If there are none, say 'No action items found.'"
+    else:
+        system = "Summarize the following document clearly and concisely. Cover the main points, key findings, and conclusions. Keep it under 200 words."
+
+    # Truncate if too long (small model context window)
+    max_chars = 6000
+    if len(text) > max_chars:
+        text = text[:max_chars] + "\n\n[...truncated...]"
+
+    try:
+        result = subprocess.run(
+            ["apfel", "-q", "--permissive", "-s", system, text],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        else:
+            return f"Error: apfel returned exit code {result.returncode}\n{result.stderr.strip()}"
+    except subprocess.TimeoutExpired:
+        return "Error: apfel timed out (60s)"
+    except FileNotFoundError:
+        return "Error: apfel not found. Install from: https://github.com/Arthur-Ficial/apfel"
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Summarize documents (PDF, Word, Excel, PPT) using local AI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  summarize report.pdf
+  summarize meeting-notes.docx --bullets
+  summarize data.xlsx --tldr
+  summarize presentation.pptx --actions
+  summarize report.pdf --prompt "List all financial figures mentioned"
+        """,
+    )
+    parser.add_argument("file", help="Path to the document to summarize")
+    parser.add_argument("--bullets", "-b", action="store_true", help="Output as bullet points")
+    parser.add_argument("--tldr", "-t", action="store_true", help="Ultra-short 2-3 sentence summary")
+    parser.add_argument("--actions", "-a", action="store_true", help="Extract action items only")
+    parser.add_argument("--raw", "-r", action="store_true", help="Show extracted text without summarizing")
+    parser.add_argument("--prompt", "-p", type=str, help="Custom prompt for the AI")
+
+    args = parser.parse_args()
+
+    filepath = Path(args.file).expanduser().resolve()
+
+    if not filepath.exists():
+        print(f"\033[31m✗ File not found: {filepath}\033[0m", file=sys.stderr)
+        sys.exit(1)
+
+    ext = filepath.suffix.lower()
+    if ext not in EXTRACTORS:
+        supported = ", ".join(sorted(EXTRACTORS.keys()))
+        print(f"\033[31m✗ Unsupported format: {ext}\033[0m", file=sys.stderr)
+        print(f"\033[2mSupported: {supported}\033[0m", file=sys.stderr)
+        sys.exit(1)
+
+    # Extract text
+    print(f"\033[36m⟩ Reading {filepath.name}...\033[0m", file=sys.stderr)
+    try:
+        text = EXTRACTORS[ext](str(filepath))
+    except ImportError as e:
+        module = str(e).split("'")[-2] if "'" in str(e) else str(e)
+        print(f"\033[31m✗ Missing Python package: {module}\033[0m", file=sys.stderr)
+        print(f"\033[2mInstall with: pip3 install {module}\033[0m", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"\033[31m✗ Failed to extract text: {e}\033[0m", file=sys.stderr)
+        sys.exit(1)
+
+    if not text or not text.strip():
+        print(f"\033[31m✗ No text could be extracted from {filepath.name}\033[0m", file=sys.stderr)
+        sys.exit(1)
+
+    # Raw mode
+    if args.raw:
+        print(text)
+        return
+
+    # Determine mode
+    if args.prompt:
+        mode = "custom"
+    elif args.bullets:
+        mode = "bullets"
+    elif args.tldr:
+        mode = "tldr"
+    elif args.actions:
+        mode = "actions"
+    else:
+        mode = "summary"
+
+    # Summarize
+    print(f"\033[36m⟩ Summarizing ({mode})...\033[0m", file=sys.stderr)
+    result = summarize_text(text, mode=mode, custom_prompt=args.prompt)
+    print()
+
+    # Render markdown if glow is available
+    if shutil.which("glow"):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write(result)
+            tmp_path = f.name
+        os.system(f"glow {tmp_path}")
+        os.unlink(tmp_path)
+    else:
+        print(result)
+
+
+if __name__ == "__main__":
+    main()

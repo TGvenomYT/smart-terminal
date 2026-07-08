@@ -1,0 +1,89 @@
+#!/bin/bash
+# ai — Chat with apfel (local LLM), markdown rendered
+#
+# Usage:
+#   ai                    # interactive chat mode
+#   ai "what is docker"   # single question, rendered response
+
+CYAN='\033[0;36m'
+DIM='\033[2m'
+BOLD='\033[1m'
+RED='\033[0;31m'
+RESET='\033[0m'
+
+# Check apfel
+if ! command -v apfel &>/dev/null; then
+    echo -e "${RED}✗ apfel not found. Install from: https://github.com/Arthur-Ficial/apfel${RESET}" >&2
+    exit 1
+fi
+
+# Render markdown helper
+render_md() {
+    if command -v glow &>/dev/null; then
+        local tmpfile=$(mktemp /tmp/apfel_ai_XXXXXX.md)
+        echo "$1" > "$tmpfile"
+        glow "$tmpfile"
+        rm -f "$tmpfile"
+    else
+        echo "$1"
+    fi
+}
+
+# Single-shot mode
+if [[ -n "$1" ]]; then
+    RESPONSE=$(apfel -q --permissive "$*" 2>/dev/null)
+    if [[ -z "$RESPONSE" ]]; then
+        echo -e "${RED}✗ No response${RESET}" >&2
+        exit 1
+    fi
+    render_md "$RESPONSE"
+    exit 0
+fi
+
+# Interactive mode
+echo -e "${BOLD}Apfel Chat${RESET} ${DIM}(type 'exit' or Ctrl+C to quit)${RESET}"
+echo ""
+
+HISTORY=""
+
+while true; do
+    echo -ne "${CYAN}you ›${RESET} "
+    read -r input
+
+    if [[ -z "$input" ]]; then
+        continue
+    fi
+    if [[ "$input" == "exit" ]] || [[ "$input" == "quit" ]] || [[ "$input" == "bye" ]]; then
+        echo -e "${DIM}Goodbye.${RESET}"
+        break
+    fi
+
+    if [[ -n "$HISTORY" ]]; then
+        CONTEXT="Previous conversation:
+${HISTORY}
+
+Now answer this: ${input}"
+    else
+        CONTEXT="$input"
+    fi
+
+    RESPONSE=$(apfel -q --permissive "$CONTEXT" 2>/dev/null)
+
+    if [[ -z "$RESPONSE" ]]; then
+        echo -e "${RED}✗ No response${RESET}"
+        continue
+    fi
+
+    HISTORY="${HISTORY}
+User: ${input}
+Assistant: ${RESPONSE}"
+
+    # Trim history
+    if [[ ${#HISTORY} -gt 3000 ]]; then
+        HISTORY="${HISTORY: -3000}"
+    fi
+
+    echo ""
+    render_md "$RESPONSE"
+    echo ""
+done
