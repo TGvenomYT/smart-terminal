@@ -508,7 +508,7 @@ _st_lookup_command() {
             echo "osascript -e 'quit app \"Docker\"'"; return 0 ;;
         *"list"*"running"*"container"*|*"running containers"*|*"docker ps"*|*"show containers"*)
             echo "docker ps"; return 0 ;;
-        *"list"*"all"*"container"*|*"all containers"*|*"docker ps -a"*)
+        *"list"*"all"*"container"*|*"show"*"all"*"container"*|*"docker ps -a"*)
             echo "docker ps -a"; return 0 ;;
         *"stop all"*"container"*|*"stop all docker"*|*"stop everything"*)
             echo 'docker stop $(docker ps -q)'; return 0 ;;
