@@ -133,10 +133,113 @@ _st_extract_location() {
     echo "$loc"
 }
 
+# ─── PROJECT TYPE DETECTION ───
+
+_st_detect_project() {
+    # Returns: node, python, rust, go, java, ruby, docker, unknown
+    if [[ -f "package.json" ]]; then echo "node"
+    elif [[ -f "requirements.txt" ]] || [[ -f "setup.py" ]] || [[ -f "pyproject.toml" ]] || [[ -f "Pipfile" ]]; then echo "python"
+    elif [[ -f "Cargo.toml" ]]; then echo "rust"
+    elif [[ -f "go.mod" ]]; then echo "go"
+    elif [[ -f "pom.xml" ]] || [[ -f "build.gradle" ]]; then echo "java"
+    elif [[ -f "Gemfile" ]]; then echo "ruby"
+    elif [[ -f "docker-compose.yml" ]] || [[ -f "docker-compose.yaml" ]] || [[ -f "Dockerfile" ]]; then echo "docker"
+    elif [[ -f "Makefile" ]]; then echo "make"
+    else echo "unknown"
+    fi
+}
+
 # ─── MAIN LOOKUP FUNCTION ───
 
 _st_lookup_command() {
     local q="${(L)1}"  # lowercase the query
+
+    # ─── CONTEXT-AWARE COMMANDS ───
+    # "run", "test", "build", "start", "install deps" etc. adapt to project type
+    local project_type=$(_st_detect_project)
+
+    case "$q" in
+        "run"|*"run project"*|*"run app"*|*"start app"*|*"run server"*|*"start server"*|*"run this"*)
+            case "$project_type" in
+                node) echo "npm run dev"; return 0 ;;
+                python)
+                    if [[ -f "manage.py" ]]; then echo "python3 manage.py runserver"
+                    elif [[ -f "app.py" ]]; then echo "python3 app.py"
+                    elif [[ -f "main.py" ]]; then echo "python3 main.py"
+                    else echo "python3 ."
+                    fi; return 0 ;;
+                rust) echo "cargo run"; return 0 ;;
+                go) echo "go run ."; return 0 ;;
+                java) echo "./gradlew run 2>/dev/null || mvn exec:java"; return 0 ;;
+                ruby) echo "bundle exec rails server 2>/dev/null || ruby main.rb"; return 0 ;;
+                docker) echo "docker compose up -d"; return 0 ;;
+                make) echo "make run"; return 0 ;;
+                *) ;;
+            esac ;;
+        "test"|*"run test"*|*"run the test"*|*"execute test"*)
+            case "$project_type" in
+                node) echo "npm test"; return 0 ;;
+                python) echo "pytest"; return 0 ;;
+                rust) echo "cargo test"; return 0 ;;
+                go) echo "go test ./..."; return 0 ;;
+                java) echo "./gradlew test 2>/dev/null || mvn test"; return 0 ;;
+                ruby) echo "bundle exec rspec"; return 0 ;;
+                make) echo "make test"; return 0 ;;
+                *) ;;
+            esac ;;
+        "build"|*"build project"*|*"build this"*|*"compile"*)
+            case "$project_type" in
+                node) echo "npm run build"; return 0 ;;
+                python) echo "python3 -m build"; return 0 ;;
+                rust) echo "cargo build"; return 0 ;;
+                go) echo "go build ./..."; return 0 ;;
+                java) echo "./gradlew build 2>/dev/null || mvn package"; return 0 ;;
+                make) echo "make"; return 0 ;;
+                docker) echo "docker compose build"; return 0 ;;
+                *) ;;
+            esac ;;
+        *"install"*"dep"*|*"install"*"package"*|"install")
+            case "$project_type" in
+                node) echo "npm install"; return 0 ;;
+                python)
+                    if [[ -f "requirements.txt" ]]; then echo "pip3 install -r requirements.txt"
+                    elif [[ -f "pyproject.toml" ]]; then echo "pip3 install -e ."
+                    elif [[ -f "Pipfile" ]]; then echo "pipenv install"
+                    else echo "pip3 install"
+                    fi; return 0 ;;
+                rust) echo "cargo fetch"; return 0 ;;
+                go) echo "go mod download"; return 0 ;;
+                ruby) echo "bundle install"; return 0 ;;
+                *) ;;
+            esac ;;
+        "lint"|*"run lint"*|*"check lint"*|*"lint"*"code"*)
+            case "$project_type" in
+                node) echo "npm run lint"; return 0 ;;
+                python) echo "ruff check . 2>/dev/null || flake8 ."; return 0 ;;
+                rust) echo "cargo clippy"; return 0 ;;
+                go) echo "golangci-lint run"; return 0 ;;
+                *) ;;
+            esac ;;
+        "format"|*"format code"*|*"prettify"*|*"auto format"*)
+            case "$project_type" in
+                node) echo "npx prettier --write ."; return 0 ;;
+                python) echo "ruff format . 2>/dev/null || black ."; return 0 ;;
+                rust) echo "cargo fmt"; return 0 ;;
+                go) echo "gofmt -w ."; return 0 ;;
+                *) ;;
+            esac ;;
+        "clean"|*"clean project"*|*"clean build"*)
+            case "$project_type" in
+                node) echo "rm -rf node_modules dist .next out"; return 0 ;;
+                python) echo "find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; rm -rf dist build *.egg-info"; return 0 ;;
+                rust) echo "cargo clean"; return 0 ;;
+                go) echo "go clean"; return 0 ;;
+                java) echo "./gradlew clean 2>/dev/null || mvn clean"; return 0 ;;
+                docker) echo "docker compose down --rmi local -v"; return 0 ;;
+                make) echo "make clean"; return 0 ;;
+                *) ;;
+            esac ;;
+    esac
 
     # ─── EARLY macOS PATTERNS (must come before navigation) ───
     case "$q" in

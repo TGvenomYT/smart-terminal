@@ -174,6 +174,7 @@ mkdir -p "$INSTALL_DIR"
 cp "$SCRIPT_DIR/smart-terminal.zsh" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/commands.zsh" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/system-prompt.txt" "$INSTALL_DIR/"
+cp "$SCRIPT_DIR/ocr.py" "$INSTALL_DIR/"
 
 # Only copy config if it doesn't exist (don't overwrite user config)
 if [[ ! -f "$INSTALL_DIR/config.zsh" ]]; then

@@ -1,0 +1,100 @@
+#!/bin/bash
+# ocr-explain — Screenshot a region, OCR the text, explain it with AI
+#
+# Usage:
+#   ocr-explain              # interactive: select screen region
+#   ocr-explain <image.png>  # OCR an existing image file
+#
+# Bind to a hotkey using:
+#   - Hammerspoon: hs.hotkey.bind({"ctrl","shift"}, "E", function() hs.execute("/path/to/ocr-explain") end)
+#   - Raycast: Add as Script Command
+#   - macOS Shortcuts: Run Shell Script action
+#   - BetterTouchTool: Trigger action → Run Shell Script
+#
+# Requires: macOS 12+ (for Vision OCR), apfel, Python 3
+
+set -euo pipefail
+
+CYAN='\033[0;36m'
+DIM='\033[2m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+RESET='\033[0m'
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+OCR_SCRIPT="${SCRIPT_DIR}/../ocr.py"
+
+# If no OCR script in bin/../, check installed location
+if [[ ! -f "$OCR_SCRIPT" ]]; then
+    OCR_SCRIPT="$HOME/.smart-terminal/ocr.py"
+fi
+
+if [[ ! -f "$OCR_SCRIPT" ]]; then
+    echo -e "${RED}✗ OCR script not found${RESET}" >&2
+    exit 1
+fi
+
+# Check apfel
+if ! command -v apfel &>/dev/null; then
+    echo -e "${RED}✗ apfel not found${RESET}" >&2
+    exit 1
+fi
+
+# Get the image
+IMAGE_PATH=""
+if [[ -n "${1:-}" ]] && [[ -f "$1" ]]; then
+    IMAGE_PATH="$1"
+else
+    # Interactive: capture screen selection
+    IMAGE_PATH=$(mktemp /tmp/ocr_capture_XXXXXX.png)
+    echo -e "${CYAN}⟩ Select a region to capture...${RESET}" >&2
+    screencapture -i "$IMAGE_PATH"
+    if [[ ! -s "$IMAGE_PATH" ]]; then
+        echo -e "${DIM}Cancelled.${RESET}" >&2
+        rm -f "$IMAGE_PATH"
+        exit 0
+    fi
+fi
+
+# OCR the image
+echo -e "${CYAN}⟩ Reading text from image...${RESET}" >&2
+TEXT=$(python3 "$OCR_SCRIPT" "$IMAGE_PATH" 2>/dev/null)
+
+# Clean up temp file
+if [[ "$IMAGE_PATH" == /tmp/ocr_capture_* ]]; then
+    rm -f "$IMAGE_PATH"
+fi
+
+if [[ -z "$TEXT" ]]; then
+    echo -e "${RED}✗ No text detected in the image${RESET}" >&2
+    exit 1
+fi
+
+echo -e "${DIM}Detected text:${RESET}" >&2
+echo -e "${DIM}─────────────${RESET}" >&2
+echo "$TEXT" >&2
+echo -e "${DIM}─────────────${RESET}" >&2
+echo "" >&2
+
+# Explain with apfel
+echo -e "${CYAN}⟩ Explaining...${RESET}" >&2
+EXPLANATION=$(apfel -q --permissive -s "Explain what this text means or does. If it's code, explain what it does. If it's an error, explain what went wrong and how to fix it. Be concise and helpful." "$TEXT" 2>/dev/null)
+
+if [[ -z "$EXPLANATION" ]]; then
+    echo -e "${RED}✗ Could not generate explanation${RESET}" >&2
+    exit 1
+fi
+
+# Render
+echo ""
+if command -v glow &>/dev/null; then
+    TMPFILE=$(mktemp /tmp/ocr_explain_XXXXXX.md)
+    echo "$EXPLANATION" > "$TMPFILE"
+    glow "$TMPFILE"
+    rm -f "$TMPFILE"
+else
+    echo "$EXPLANATION"
+fi
+
+# Also show a macOS notification
+osascript -e "display notification \"$( echo "$EXPLANATION" | head -2 | tr '\n' ' ')\" with title \"Smart Terminal\" subtitle \"OCR Explain\"" 2>/dev/null || true

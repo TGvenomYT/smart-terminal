@@ -123,6 +123,7 @@ function ask() {
     if [[ $dangerous -eq 1 ]]; then
         if [[ "$confirm" =~ ^[Yy]$ ]]; then
             echo ""
+            _st_remember "$query" "$cmd"
             eval "$cmd"
         else
             echo "${ST_DIM}Cancelled.${ST_RESET}"
@@ -132,6 +133,7 @@ function ask() {
             echo "${ST_DIM}Cancelled.${ST_RESET}"
         else
             echo ""
+            _st_remember "$query" "$cmd"
             eval "$cmd"
         fi
     fi
@@ -188,11 +190,12 @@ function explain() {
 }
 
 # ─────────────────────────────────────────────────────────────
-# 4. Auto error explanation
-#    After a command fails, shows a hint to run explain-last.
-#    Set SMART_TERMINAL_AUTO_EXPLAIN=1 to enable.
+# 4. Auto error interception
+#    Automatically explains failed commands inline.
+#    Set SMART_TERMINAL_AUTO_EXPLAIN=1 to enable (default: on)
+#    Set SMART_TERMINAL_AUTO_EXPLAIN=0 to disable
 # ─────────────────────────────────────────────────────────────
-typeset -g SMART_TERMINAL_AUTO_EXPLAIN=${SMART_TERMINAL_AUTO_EXPLAIN:-0}
+typeset -g SMART_TERMINAL_AUTO_EXPLAIN=${SMART_TERMINAL_AUTO_EXPLAIN:-1}
 typeset -g _ST_LAST_CMD=""
 
 function _st_preexec() {
@@ -202,22 +205,48 @@ function _st_preexec() {
 function _st_precmd() {
     local exit_code=$?
 
-    if [[ $SMART_TERMINAL_AUTO_EXPLAIN -ne 1 ]] || [[ $exit_code -eq 0 ]] || [[ -z "$_ST_LAST_CMD" ]]; then
+    # Skip if succeeded or no last command
+    if [[ $exit_code -eq 0 ]] || [[ -z "$_ST_LAST_CMD" ]]; then
         _ST_LAST_CMD=""
         return
     fi
 
-    # Skip our own functions
-    if [[ "$_ST_LAST_CMD" =~ "^(\?|ask|explain|port)" ]]; then
+    # Skip our own functions and common non-errors
+    if [[ "$_ST_LAST_CMD" =~ "^(\?|ask|explain|port|summarize|git-changes|ai |smart-commit)" ]]; then
         _ST_LAST_CMD=""
         return
     fi
 
-    echo ""
-    echo "${ST_YELLOW}⟩ Command failed (exit $exit_code).${ST_RESET} ${ST_DIM}Run 'explain-last' to get an explanation.${ST_RESET}"
+    # Skip grep/find returning "not found" (exit 1 is normal)
+    if [[ $exit_code -eq 1 ]] && [[ "$_ST_LAST_CMD" =~ "^(grep|find|which|command)" ]]; then
+        _ST_LAST_CMD=""
+        return
+    fi
 
+    # Store for explain-last
     typeset -g _ST_FAILED_CMD="$_ST_LAST_CMD"
     typeset -g _ST_FAILED_EXIT="$exit_code"
+
+    if [[ $SMART_TERMINAL_AUTO_EXPLAIN -eq 1 ]] && command -v apfel &>/dev/null; then
+        # Re-run silently to capture stderr, then explain
+        echo ""
+        echo "${ST_YELLOW}⟩ Command failed (exit $exit_code). Explaining...${ST_RESET}"
+        local err_text
+        err_text=$(eval "$_ST_LAST_CMD" 2>&1 >/dev/null 2>&1 | tail -5)
+        # If re-run didn't produce output, construct context from the command itself
+        if [[ -z "$err_text" ]]; then
+            err_text="Command '$_ST_LAST_CMD' exited with code $exit_code"
+        fi
+        local explanation
+        explanation=$(apfel -q --permissive -s "Explain this shell error in 1-2 short sentences. What went wrong and how to fix it. Be direct and practical." "$err_text" 2>/dev/null)
+        if [[ -n "$explanation" ]]; then
+            echo "${ST_DIM}  $explanation${ST_RESET}"
+        fi
+    else
+        echo ""
+        echo "${ST_YELLOW}⟩ Command failed (exit $exit_code).${ST_RESET} ${ST_DIM}Run 'explain-last' to get an explanation.${ST_RESET}"
+    fi
+
     _ST_LAST_CMD=""
 }
 
@@ -279,6 +308,67 @@ function smart-commit() {
         [Ee]) git commit -e -m "$msg" ;;
         *)    git commit -m "$msg" ;;
     esac
+}
+
+# ─────────────────────────────────────────────────────────────
+# 6. Command Memory
+#    Remembers commands you run via ? and lets you recall them.
+#    Usage: recall deploy    → shows last command matching "deploy"
+#           recall           → shows recent smart-terminal commands
+# ─────────────────────────────────────────────────────────────
+typeset -g _ST_MEMORY_FILE="${SMART_TERMINAL_DIR}/memory.log"
+
+# Save a command to memory (called internally after ? executes)
+_st_remember() {
+    local query="$1"
+    local cmd="$2"
+    [[ -z "$cmd" ]] && return
+    # Store as: timestamp | query | command
+    echo "$(date '+%Y-%m-%d %H:%M') | $query | $cmd" >> "$_ST_MEMORY_FILE"
+    # Keep only last 200 entries
+    if [[ $(wc -l < "$_ST_MEMORY_FILE" 2>/dev/null) -gt 200 ]]; then
+        tail -100 "$_ST_MEMORY_FILE" > "${_ST_MEMORY_FILE}.tmp" && mv "${_ST_MEMORY_FILE}.tmp" "$_ST_MEMORY_FILE"
+    fi
+}
+
+# Recall a previous command by keyword
+function recall() {
+    if [[ ! -f "$_ST_MEMORY_FILE" ]]; then
+        echo "${ST_DIM}No command history yet. Use ? to run some commands first.${ST_RESET}"
+        return 1
+    fi
+
+    if [[ -z "$1" ]]; then
+        # Show last 10
+        echo "${ST_CYAN}Recent commands:${ST_RESET}"
+        tail -10 "$_ST_MEMORY_FILE" | while IFS='|' read -r ts query cmd; do
+            echo "  ${ST_DIM}$ts${ST_RESET} ${ST_GREEN}$cmd${ST_RESET}  ${ST_DIM}($query)${ST_RESET}"
+        done
+        return 0
+    fi
+
+    # Search by keyword
+    local keyword="${(L)1}"
+    local matches=$(grep -i "$keyword" "$_ST_MEMORY_FILE" | tail -5)
+    if [[ -z "$matches" ]]; then
+        echo "${ST_DIM}No commands matching '$1' in memory.${ST_RESET}"
+        return 1
+    fi
+
+    echo "${ST_CYAN}Commands matching '$1':${ST_RESET}"
+    echo "$matches" | while IFS='|' read -r ts query cmd; do
+        echo "  ${ST_DIM}$ts${ST_RESET} ${ST_GREEN}$cmd${ST_RESET}  ${ST_DIM}($query)${ST_RESET}"
+    done
+
+    # Offer to run the last match
+    local last_cmd=$(echo "$matches" | tail -1 | cut -d'|' -f3 | sed 's/^ //')
+    echo ""
+    echo -n "${ST_DIM}Run '$last_cmd'? [Y/n]:${ST_RESET} "
+    local confirm
+    read -r confirm
+    if [[ ! "$confirm" =~ ^[Nn]$ ]]; then
+        eval "$last_cmd"
+    fi
 }
 
 # ─────────────────────────────────────────────────────────────
