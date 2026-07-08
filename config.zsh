@@ -1,10 +1,13 @@
+# ─────────────────────────────────────────────────────────────
 # Smart Terminal Configuration
 # Edit these values to customize behavior.
+# ─────────────────────────────────────────────────────────────
 
-# Auto-explain failed commands (shows a hint after failures)
-# Set to 1 to enable, 0 to disable
+# Auto-explain failed commands inline
+# 1 = automatically explain errors (default)
+# 0 = just show "Command failed" hint, use explain-last manually
 export SMART_TERMINAL_AUTO_EXPLAIN=1
 
 # Suppress the "Smart Terminal loaded" message on shell startup
-# Set to 1 to silence
+# 1 = quiet, 0 = show message (default)
 export SMART_TERMINAL_QUIET=0

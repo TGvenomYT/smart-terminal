@@ -38,7 +38,7 @@ fi
 echo ""
 
 # Remove symlinks
-TOOLS=(ai git-changes summarize)
+TOOLS=(ai git-changes summarize ocr-explain)
 for tool in "${TOOLS[@]}"; do
     if [[ -L "$BIN_DIR/$tool" ]]; then
         rm -f "$BIN_DIR/$tool" 2>/dev/null || sudo rm -f "$BIN_DIR/$tool"
