@@ -14,7 +14,7 @@ No cloud. No API keys. No telemetry.
 # → lsof -ti :3000 | xargs kill -9
 
 ? run
-# → (Python) python3 -m venv venv && venv/bin/pip3 install -r requirements.txt && venv/bin/python3 main_api.py
+# → (Python) python3 -m venv venv && pip install -r requirements.txt && python3 main_api.py
 # → (Node) npm run dev
 # → (C++) cmake -B build && cmake --build build && ./build/myapp
 # → (Docker) docker compose up -d
@@ -144,7 +144,7 @@ Smart Terminal detects your project type (Python, Node, C, C++, Rust, Go, Java, 
 
 | Type | Detected by | Run | Build | Setup |
 |------|-------------|-----|-------|-------|
-| Python | `requirements.txt`, `pyproject.toml`, `Pipfile`, or `.py` files | `venv/bin/python3 <entry>` | `python3 -m build` | `python3 -m venv venv && pip install` |
+| Python | `requirements.txt`, `pyproject.toml`, `Pipfile`, or `.py` files | `python3 <entry>` | `python3 -m build` | `python3 -m venv venv && pip install` |
 | Node.js | `package.json` | `npm run dev` / `npm start` | `npm run build` | `npm install` |
 | C | `.c` files | `gcc -o a.out && ./a.out` | `gcc -o a.out *.c` | — |
 | C++ | `CMakeLists.txt` or `.cpp` files | `cmake → build → run` | `cmake --build build` | `cmake -B build` |
