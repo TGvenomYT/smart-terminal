@@ -238,7 +238,7 @@ function _st_precmd() {
             err_text="Command '$_ST_LAST_CMD' exited with code $exit_code"
         fi
         local explanation
-        explanation=$(apfel -q --permissive -s "Explain this shell error in 1-2 short sentences. What went wrong and how to fix it. Be direct and practical." "$err_text" 2>/dev/null)
+        explanation=$(apfel -q --permissive -s "Explain this shell error in 1-2 short sentences. What went wrong and how to fix it. Be direct and practical." -- "$err_text" 2>/dev/null)
         if [[ -n "$explanation" ]]; then
             echo "${ST_DIM}  $explanation${ST_RESET}"
         fi

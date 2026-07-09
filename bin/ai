@@ -31,7 +31,7 @@ render_md() {
 
 # Single-shot mode
 if [[ -n "$1" ]]; then
-    RESPONSE=$(apfel -q --permissive "$*" 2>/dev/null)
+    RESPONSE=$(apfel -q --permissive -- "$*" 2>/dev/null)
     if [[ -z "$RESPONSE" ]]; then
         echo -e "${RED}✗ No response${RESET}" >&2
         exit 1
@@ -67,7 +67,7 @@ Now answer this: ${input}"
         CONTEXT="$input"
     fi
 
-    RESPONSE=$(apfel -q --permissive "$CONTEXT" 2>/dev/null)
+    RESPONSE=$(apfel -q --permissive -- "$CONTEXT" 2>/dev/null)
 
     if [[ -z "$RESPONSE" ]]; then
         echo -e "${RED}✗ No response${RESET}"

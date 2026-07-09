@@ -66,7 +66,7 @@ echo -e "${DIM}─────────────${RESET}" >&2
 echo "" >&2
 
 echo -e "${CYAN}⟩ Explaining...${RESET}" >&2
-EXPLANATION=$(apfel -q --permissive -s "Explain what this text means or does. If it's code, explain what it does. If it's an error, explain what went wrong and how to fix it. Be concise and helpful." "$TEXT" 2>/dev/null)
+EXPLANATION=$(apfel -q --permissive -s "Explain what this text means or does. If it's code, explain what it does. If it's an error, explain what went wrong and how to fix it. Be concise and helpful." -- "$TEXT" 2>/dev/null)
 
 if [[ -z "$EXPLANATION" ]]; then
     echo -e "${RED}✗ Could not generate explanation${RESET}" >&2
