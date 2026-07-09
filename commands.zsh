@@ -610,15 +610,7 @@ _st_lookup_command() {
         echo "cd ~/$nav_target"; return 0
     fi
 
-    # Single word that matches a known/findable folder
-    if [[ "$q" =~ "^[a-z][a-z0-9_-]+$" ]] && [[ ! "$q" =~ "^(clear|history|whoami|uptime|date|time|battery|caffeinate|stash|push|pull|mute|unmute|sleep|shutdown|reboot|alias|hostname|explain)$" ]]; then
-        local resolved=$(_st_find_folder "$q")
-        if [[ -n "$resolved" ]]; then
-            echo "cd $resolved"; return 0
-        fi
-        # Folder not found anywhere — don't fall through to unrelated patterns
-        return 1
-    fi
+
 
     # "open here" / "open ." / "open current"
     case "$q" in
@@ -1052,6 +1044,14 @@ _st_lookup_command() {
         *"ssh"*)
             echo "ssh"; return 0 ;;
     esac
+
+    # ─── LAST RESORT: Single word → try as folder name ───
+    if [[ "$q" =~ "^[a-z][a-z0-9_-]+$" ]]; then
+        local resolved=$(_st_find_folder "$q")
+        if [[ -n "$resolved" ]]; then
+            echo "cd $resolved"; return 0
+        fi
+    fi
 
     # No match
     return 1

@@ -212,7 +212,7 @@ function _st_precmd() {
     fi
 
     # Skip our own functions and common non-errors
-    if [[ "$_ST_LAST_CMD" =~ "^(\?|ask|explain|port|summarize|git-changes|ai |smart-commit)" ]]; then
+    if [[ "$_ST_LAST_CMD" =~ "^(noglob )?(ask|\?|explain|port|summarize|git-changes|ai |smart-commit|what-did-i-do|recall)" ]]; then
         _ST_LAST_CMD=""
         return
     fi
