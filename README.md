@@ -324,6 +324,32 @@ Anything not in the dictionary goes to Apfel's on-device model as a fallback.
 - Everything runs locally — no data leaves your machine
 - The LLM fallback uses `--permissive` mode but the dictionary handles most common cases deterministically
 
+## Changelog
+
+### v1.2.0
+- **Critical fix:** Single-word commands (`test`, `build`, `install`, `lint`, `docker`, etc.) no longer get hijacked by folder navigation
+- **Critical fix:** Auto-explain no longer fires on `?` commands
+- Added `--` separator to all apfel calls to handle text with dashes
+- OCR uses precompiled Swift binary (fast, reliable)
+- C/C++ project support (gcc, g++, cmake, vcpkg, conan)
+- Smart Python entry point detection (reads README, ecosystem.config.js, Procfile)
+- Auto venv handling skips pip when no deps file exists
+- `smart-terminal update` command
+- `smart-terminal --version` command
+- `recall` command memory
+- Auto error interception
+
+### v1.0.0
+- Initial release
+- ~250+ command dictionary
+- Dynamic folder resolution
+- Context-aware run/test/build/setup
+- Document summarizer
+- Git diff explainer
+- AI chat with markdown rendering
+- OCR Explain
+- Auto-install dependencies via Homebrew
+
 ## License
 
 MIT
