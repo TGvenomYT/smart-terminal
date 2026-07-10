@@ -97,7 +97,7 @@ fi
 
 # git check
 if ! command -v git &>/dev/null; then
-    WARNINGS+=("git — needed for git-changes and smart-commit")
+    WARNINGS+=("git — needed for git-changes")
     echo -e "  ${YELLOW}△${RESET} git not found"
 else
     echo -e "  ${GREEN}✓${RESET} git"
@@ -339,6 +339,5 @@ echo -e "    port <number>    Check what's using a port"
 echo -e "    ai <question>    Chat with local AI"
 echo -e "    summarize <file> Summarize a document"
 echo -e "    git-changes      Explain your code changes"
-echo -e "    smart-commit     Generate commit messages"
 echo -e "    ocr-explain      Screenshot → OCR → explain"
 echo ""

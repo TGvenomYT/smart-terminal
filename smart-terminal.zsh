@@ -214,7 +214,7 @@ function _st_precmd() {
     fi
 
     # Skip our own functions and common non-errors
-    if [[ "$_ST_LAST_CMD" =~ "^(noglob )?(ask|\?|explain|port|summarize|git-changes|ai |smart-commit|what-did-i-do|recall)" ]]; then
+    if [[ "$_ST_LAST_CMD" =~ "^(noglob )?(ask|\?|explain|port|summarize|git-changes|ai |what-did-i-do|recall)" ]]; then
         _ST_LAST_CMD=""
         return
     fi
@@ -282,34 +282,6 @@ function what-did-i-do() {
     else
         git log --since="$since" --author="$(git config user.name)" --oneline 2>/dev/null
     fi
-}
-
-function smart-commit() {
-    local msg
-    if command -v apfel-gitsum &>/dev/null; then
-        msg=$(git diff --cached | apfel-gitsum 2>/dev/null)
-    elif command -v apfel &>/dev/null; then
-        msg=$(git diff --cached | apfel -q -s "Generate a concise git commit message for this diff. Output only the message, no explanation." 2>/dev/null)
-    fi
-
-    if [[ -z "$msg" ]]; then
-        echo "${ST_RED}✗ No staged changes or could not generate message.${ST_RESET}"
-        return 1
-    fi
-
-    echo "${ST_GREEN}Suggested commit message:${ST_RESET}"
-    echo "  $msg"
-    echo ""
-    echo -n "${ST_DIM}Use this message? [Y/n/e(dit)]:${ST_RESET} "
-
-    local confirm
-    read -r confirm
-
-    case "$confirm" in
-        [Nn]) echo "${ST_DIM}Cancelled.${ST_RESET}" ;;
-        [Ee]) git commit -e -m "$msg" ;;
-        *)    git commit -m "$msg" ;;
-    esac
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -442,7 +414,6 @@ function smart-terminal() {
             echo "  explain <error>             Explain an error"
             echo "  explain-last                Explain the last failed command"
             echo "  port <number>               Check what's using a port"
-            echo "  smart-commit                Generate git commit message"
             echo "  what-did-i-do [since]       Summarize git activity"
             echo ""
             echo "CLI tools:"

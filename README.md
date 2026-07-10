@@ -33,7 +33,6 @@ No cloud. No API keys. No telemetry.
 | `ai <question>` | Chat with local AI (markdown rendered) |
 | `summarize <file>` | Summarize PDF, Word, Excel, or PPT documents |
 | `git-changes` | Explain the intent behind your code changes |
-| `smart-commit` | Generate commit messages from staged changes |
 | `ocr-explain` | Screenshot → OCR → AI explanation |
 | `smart-terminal update` | Pull latest version and reinstall |
 | `smart-terminal --version` | Show installed version |
