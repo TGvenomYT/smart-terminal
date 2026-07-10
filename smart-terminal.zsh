@@ -32,7 +32,9 @@ fi
 # ─────────────────────────────────────────────────────────────
 _st_render_md() {
     if command -v glow &>/dev/null; then
-        local tmpfile=$(mktemp /tmp/st_md_XXXXXX.md)
+        local tmpfile=$(mktemp /tmp/st_md_XXXXXXXX)
+        mv "$tmpfile" "${tmpfile}.md"
+        tmpfile="${tmpfile}.md"
         cat > "$tmpfile"
         glow "$tmpfile"
         rm -f "$tmpfile"

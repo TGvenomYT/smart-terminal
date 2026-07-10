@@ -144,7 +144,9 @@ fi
 
 # Render markdown if glow is available
 if command -v glow &>/dev/null; then
-    TMPFILE=$(mktemp /tmp/git_changes_XXXXXX.md)
+    TMPFILE=$(mktemp /tmp/git_changes_XXXXXXXX)
+    mv "$TMPFILE" "${TMPFILE}.md"
+    TMPFILE="${TMPFILE}.md"
     echo "$RESULT" > "$TMPFILE"
     glow "$TMPFILE"
     rm -f "$TMPFILE"

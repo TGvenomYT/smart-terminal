@@ -20,7 +20,9 @@ fi
 # Render markdown helper
 render_md() {
     if command -v glow &>/dev/null; then
-        local tmpfile=$(mktemp /tmp/apfel_ai_XXXXXX.md)
+        local tmpfile
+        tmpfile=$(mktemp /tmp/st_ai_XXXXXXXX) && mv "$tmpfile" "${tmpfile}.md"
+        tmpfile="${tmpfile}.md"
         echo "$1" > "$tmpfile"
         glow "$tmpfile"
         rm -f "$tmpfile"
