@@ -172,7 +172,7 @@ function explain() {
         if command -v apfel-explain &>/dev/null; then
             echo "$*" | apfel-explain
         elif command -v apfel &>/dev/null; then
-            echo "$*" | apfel -q -s "Explain this error message concisely. What went wrong and how to fix it."
+            echo "$*" | apfel -q -s "Explain this error message concisely on macOS (not Linux). What went wrong and how to fix it. Never suggest apt-get, systemctl, or Linux-only tools."
         else
             echo "${ST_RED}✗ apfel not installed${ST_RESET}"
             return 1
@@ -181,7 +181,7 @@ function explain() {
         if command -v apfel-explain &>/dev/null; then
             apfel-explain
         elif command -v apfel &>/dev/null; then
-            apfel -q -s "Explain this error message concisely. What went wrong and how to fix it."
+            apfel -q -s "Explain this error message concisely on macOS (not Linux). What went wrong and how to fix it. Never suggest apt-get, systemctl, or Linux-only tools."
         else
             echo "${ST_RED}✗ apfel not installed${ST_RESET}"
             return 1
@@ -238,7 +238,7 @@ function _st_precmd() {
             err_text="Command '$_ST_LAST_CMD' exited with code $exit_code"
         fi
         local explanation
-        explanation=$(apfel -q --permissive -s "Explain this shell error in 1-2 short sentences. What went wrong and how to fix it. Be direct and practical." -- "$err_text" 2>/dev/null)
+        explanation=$(apfel -q --permissive -s "Explain this shell error on macOS in 1-2 short sentences. What went wrong and how to fix it. Be direct and practical. This is macOS with zsh — never suggest apt-get, systemctl, or Linux tools." -- "$err_text" 2>/dev/null)
         if [[ -n "$explanation" ]]; then
             echo "${ST_DIM}  $explanation${ST_RESET}"
         fi

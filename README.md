@@ -286,19 +286,6 @@ _st_custom_lookup() {
 
 Custom commands are checked first, so you can override built-in patterns too. This file is never overwritten by updates.
 
-## Hotkey setup (optional)
-
-### Hammerspoon
-
-Copy `extras/hammerspoon-init.lua` to your `~/.hammerspoon/init.lua`:
-
-- `Ctrl+Shift+E` — OCR Explain (screenshot → read → explain)
-- `Ctrl+Shift+A` — Ask (natural language prompt → command)
-
-### Raycast
-
-Add `ocr-explain` or `ai` as Script Commands in Raycast preferences.
-
 ## Built-in command coverage
 
 The dictionary handles ~250+ patterns across:
