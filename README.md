@@ -4,7 +4,7 @@ A local AI-powered shell assistant for macOS. Type natural language, get shell c
 
 No cloud. No API keys. No telemetry.
 
-## What it does
+## What it does.
 
 ```bash
 ? show disk usage by folder
