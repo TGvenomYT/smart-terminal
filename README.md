@@ -54,7 +54,7 @@ No cloud. No API keys. No telemetry.
 - **zsh** — default macOS shell (required)
 - **Python 3** — for document summarizer (optional)
 - **[glow](https://github.com/charmbracelet/glow)** — for rendered markdown output (optional)
-- **Xcode Command Line Tools** — for OCR tool compilation and C/C++ support (optional, `xcode-select --install`)
+- **Xcode Command Line Tools** — for OCR tool compilation and C/C++ support (optional, run `xcode-select --install` to install)
 
 ## Install
 
